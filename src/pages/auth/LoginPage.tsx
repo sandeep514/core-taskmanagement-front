@@ -167,12 +167,7 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-lg border border-dashed border-border bg-secondary/50 p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground mb-1">Demo credentials (Laravel seed)</p>
-            <p>Admin: admin@taskflow.com / password</p>
-            <p>Employee: alex@taskflow.com / password</p>
-            <p>Client: acme@login.com / password</p>
-          </div>
+          
         </div>
       </div>
     </div>
