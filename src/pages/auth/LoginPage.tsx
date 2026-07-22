@@ -12,7 +12,7 @@ import { getApiError } from '@/lib/api-error'
 import { homePathForRole } from '@/lib/api'
 
 const roleDefaults: Record<UserRole, string> = {
-  admin: 'admin@taskflow.com',
+  admin: '',
   employee: 'alex@taskflow.com',
   client: 'acme@login.com',
 }
