@@ -13,8 +13,8 @@ import { homePathForRole } from '@/lib/api'
 
 const roleDefaults: Record<UserRole, string> = {
   admin: '',
-  employee: 'alex@taskflow.com',
-  client: 'acme@login.com',
+  employee: '',
+  client: '',
 }
 
 export function LoginPage() {
@@ -22,7 +22,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [role, setRole] = useState<UserRole>('admin')
   const [email, setEmail] = useState(roleDefaults.admin)
-  const [password, setPassword] = useState('password')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   if (isAuthenticated && user) {
