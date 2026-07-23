@@ -118,14 +118,21 @@ export interface Task {
   task_created_on: string
   deadline: string | null
   actual_complete_on: string | null
+  /** @deprecated Prefer assigned_to_ids / assignees */
   assigned_to: number | null
+  assigned_to_ids?: number[]
+  assigned_to_client?: number | null
   created_by: number | null
   priority: TaskPriority
   task_type: TaskType
   status: TaskStatus
   is_active?: boolean
+  /** @deprecated Prefer assignees */
   assignee?: Employee | null
+  assignees?: Employee[]
+  client_assignee?: Client | null
   creator?: Employee | null
+  project?: Pick<Project, 'id' | 'project_name' | 'client_id'> | null
   attachments?: TaskAttachment[]
   comments?: TaskComment[]
   attachments_count?: number
@@ -189,7 +196,8 @@ export interface TaskFormData {
   title: string
   details: string
   deadline: string
-  assigned_to: number | ''
+  assigned_to_ids: number[]
+  assigned_to_client: number | ''
   priority: TaskPriority
   task_type: TaskType
   status: TaskStatus

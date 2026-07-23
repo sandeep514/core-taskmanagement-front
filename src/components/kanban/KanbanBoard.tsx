@@ -81,11 +81,13 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
       updateTaskStatus(taskId, status),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
     },
     onError: (err) => {
       toast.error(getApiError(err, 'Failed to update task status'))
       setItems(tasks)
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
     },
   })
 

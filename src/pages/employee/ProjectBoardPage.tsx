@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate, cn, isTaskAssignedToUser } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 
 type TaskScopeFilter = 'mine' | 'all'
@@ -49,7 +49,7 @@ export function ProjectBoardPage() {
   const filteredTasks = useMemo(() => {
     const list = tasks ?? []
     if (taskFilter !== 'mine' || !user?.id) return list
-    return list.filter((t) => t.assigned_to === user.id)
+    return list.filter((t) => isTaskAssignedToUser(t, user.id, 'employee'))
   }, [tasks, taskFilter, user?.id])
 
   if (loadingProjects || loadingTasks) return <PageLoader />

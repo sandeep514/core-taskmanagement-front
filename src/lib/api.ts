@@ -90,10 +90,13 @@ function normalizeTaskPayload(payload: Partial<TaskFormData>) {
     title: payload.title,
     details: emptyToNull(payload.details ?? '') as string | null,
     deadline: emptyToNull(payload.deadline ?? '') as string | null,
-    assigned_to:
-      payload.assigned_to === '' || payload.assigned_to === undefined
+    assigned_to_ids: Array.isArray(payload.assigned_to_ids)
+      ? payload.assigned_to_ids.map(Number)
+      : [],
+    assigned_to_client:
+      payload.assigned_to_client === '' || payload.assigned_to_client === undefined
         ? null
-        : Number(payload.assigned_to),
+        : Number(payload.assigned_to_client),
     priority: payload.priority,
     task_type: payload.task_type,
     status: payload.status,
@@ -443,6 +446,16 @@ export async function fetchMyProjects(): Promise<Project[]> {
 export async function fetchProjectTasks(projectId: number): Promise<Task[]> {
   const base = portalBase()
   const { data } = await api.get<Task[]>(`/${base}/projects/${projectId}/tasks`)
+  return data
+}
+
+/** Tasks assigned to the current employee/client across all projects. */
+export async function fetchMyAssignedTasks(): Promise<Task[]> {
+  const base = portalBase()
+  if (base === 'admin') {
+    return []
+  }
+  const { data } = await api.get<Task[]>(`/${base}/my-tasks`)
   return data
 }
 

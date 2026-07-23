@@ -23,7 +23,7 @@ import {
 } from '@/lib/api'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
-import { cn, formatDate, initials, isOverdue } from '@/lib/utils'
+import { cn, formatDate, formatTaskAssignees, initials, isClientAssignedTask, isOverdue } from '@/lib/utils'
 import { getApiError } from '@/lib/api-error'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -69,6 +69,7 @@ export function TaskDetailModal({
       setComment('')
       qc.invalidateQueries({ queryKey: ['task', taskId] })
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
       toast.success('Comment added')
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to add comment')),
@@ -79,6 +80,7 @@ export function TaskDetailModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['task', taskId] })
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
       toast.success('Attachment uploaded')
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to upload file')),
@@ -88,6 +90,7 @@ export function TaskDetailModal({
     mutationFn: () => deactivateTask(taskId!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
       toast.success('Task deactivated')
       onOpenChange(false)
     },
@@ -98,6 +101,7 @@ export function TaskDetailModal({
   const status = TASK_STATUSES.find((s) => s.value === task?.status)
   const taskType = TASK_TYPES.find((t) => t.value === (task?.task_type ?? 'general'))
   const overdue = task ? isOverdue(task.deadline, task.status) : false
+  const clientAssigned = task ? isClientAssignedTask(task) : false
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,11 +112,21 @@ export function TaskDetailModal({
           </div>
         ) : (
           <>
-            <DialogHeader className="p-6 pb-4">
+            <DialogHeader
+              className={cn(
+                'p-6 pb-4',
+                clientAssigned && 'bg-violet-50 border-b border-violet-100',
+              )}
+            >
               <div className="flex items-start justify-between gap-4 pr-6">
                 <div className="min-w-0">
                   <DialogTitle className="text-xl leading-snug">{task.title}</DialogTitle>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {clientAssigned && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">
+                        Assigned to client
+                      </span>
+                    )}
                     {status && (
                       <span className={cn('rounded-md border px-2 py-0.5 text-xs font-semibold', status.color)}>
                         {status.label}
@@ -182,15 +196,45 @@ export function TaskDetailModal({
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="rounded-lg border border-border p-3">
-                  <p className="text-xs text-muted-foreground mb-1.5">Assignee</p>
-                  {task.assignee ? (
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-7 w-7">
-                        <AvatarFallback className="text-[10px]">
-                          {initials(task.assignee.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium">{task.assignee.name}</span>
+                  <p className="text-xs text-muted-foreground mb-1.5">Assignees</p>
+                  {(task.assignees && task.assignees.length > 0) ||
+                  task.assignee ||
+                  task.client_assignee ? (
+                    <div className="space-y-2">
+                      {task.client_assignee ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-7 w-7">
+                            <AvatarFallback className="text-[10px] bg-violet-100 text-violet-700">
+                              {initials(task.client_assignee.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium">
+                            Client · {task.client_assignee.name}
+                          </span>
+                        </div>
+                      ) : (
+                        (task.assignees?.length
+                          ? task.assignees
+                          : task.assignee
+                            ? [task.assignee]
+                            : []
+                        ).map((person) => (
+                          <div key={person.id} className="flex items-center gap-2">
+                            <Avatar className="h-7 w-7">
+                              <AvatarFallback className="text-[10px]">
+                                {initials(person.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium">{person.name}</span>
+                          </div>
+                        ))
+                      )}
+                      {!task.client_assignee &&
+                        (task.assignees?.length ?? 0) > 1 && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatTaskAssignees(task)}
+                          </p>
+                        )}
                     </div>
                   ) : (
                     <span className="text-sm text-muted-foreground">Unassigned</span>

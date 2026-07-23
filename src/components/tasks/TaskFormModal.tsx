@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { addTaskAttachment, createTask, fetchProjectMembers, updateTask } from '@/lib/api'
+import { addTaskAttachment, createTask, fetchProject, fetchProjectMembers, updateTask } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
+import { cn, taskAssigneeIds } from '@/lib/utils'
 import type { Task, TaskFormData, TaskPriority, TaskStatus, TaskType } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -37,7 +38,8 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   title: '',
   details: '',
   deadline: '',
-  assigned_to: '',
+  assigned_to_ids: [],
+  assigned_to_client: '',
   priority: 'medium',
   task_type: 'general',
   status,
@@ -63,6 +65,11 @@ export function TaskFormModal({
     queryFn: () => fetchProjectMembers(projectId),
     enabled: open && !!projectId,
   })
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => fetchProject(projectId),
+    enabled: open && !!projectId,
+  })
   const [form, setForm] = useState<TaskFormData>(empty(defaultStatus))
   const [files, setFiles] = useState<File[]>([])
 
@@ -72,7 +79,8 @@ export function TaskFormModal({
         title: task.title,
         details: task.details || '',
         deadline: task.deadline || '',
-        assigned_to: task.assigned_to ?? '',
+        assigned_to_ids: taskAssigneeIds(task),
+        assigned_to_client: task.assigned_to_client ?? '',
         priority: task.priority,
         task_type: task.task_type ?? 'general',
         status: task.status,
@@ -82,6 +90,28 @@ export function TaskFormModal({
     }
     setFiles([])
   }, [task, defaultStatus, open])
+
+  const clearAssignees = () => {
+    setForm((f) => ({ ...f, assigned_to_ids: [], assigned_to_client: '' }))
+  }
+
+  const assignClient = (clientId: number) => {
+    setForm((f) => ({
+      ...f,
+      assigned_to_ids: [],
+      assigned_to_client: f.assigned_to_client === clientId ? '' : clientId,
+    }))
+  }
+
+  const toggleEmployee = (employeeId: number) => {
+    setForm((f) => {
+      const has = f.assigned_to_ids.includes(employeeId)
+      const next = has
+        ? f.assigned_to_ids.filter((id) => id !== employeeId)
+        : [...f.assigned_to_ids, employeeId]
+      return { ...f, assigned_to_ids: next, assigned_to_client: '' }
+    })
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -96,6 +126,7 @@ export function TaskFormModal({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
       toast.success(task ? 'Task updated' : 'Task created')
       onOpenChange(false)
     },
@@ -116,6 +147,9 @@ export function TaskFormModal({
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
+
+  const isUnassigned = form.assigned_to_ids.length === 0 && form.assigned_to_client === ''
+  const activeEmployees = (employees ?? []).filter((e) => e.status === 'active')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,31 +232,6 @@ export function TaskFormModal({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Assignee</Label>
-              <Select
-                value={form.assigned_to === '' ? 'none' : String(form.assigned_to)}
-                onValueChange={(v) =>
-                  setForm({ ...form, assigned_to: v === 'none' ? '' : Number(v) })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {(employees ?? [])
-                    .filter((e) => e.status === 'active')
-                    .map((e) => (
-                      <SelectItem key={e.id} value={String(e.id)}>
-                        {e.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
               <Label>Deadline</Label>
               <Input
                 type="date"
@@ -230,6 +239,70 @@ export function TaskFormModal({
                 onChange={(e) => setForm({ ...form, deadline: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Assignees</Label>
+            <p className="text-xs text-muted-foreground">
+              Select one or more employees, or the client (not both).
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={clearAssignees}
+                className={cn(
+                  'rounded-lg border px-3 py-1.5 text-sm transition-colors',
+                  isUnassigned
+                    ? 'border-primary bg-primary/10 text-primary font-medium'
+                    : 'border-border text-muted-foreground hover:bg-secondary',
+                )}
+              >
+                Unassigned
+              </button>
+              {project?.client && (
+                <button
+                  type="button"
+                  onClick={() => assignClient(project.client!.id)}
+                  className={cn(
+                    'rounded-lg border px-3 py-1.5 text-sm transition-colors',
+                    form.assigned_to_client === project.client.id
+                      ? 'border-violet-500 bg-violet-50 text-violet-800 font-medium'
+                      : 'border-border text-muted-foreground hover:bg-secondary',
+                  )}
+                >
+                  Client · {project.client.name}
+                </button>
+              )}
+            </div>
+            {activeEmployees.length > 0 && (
+              <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                {activeEmployees.map((e) => {
+                  const checked = form.assigned_to_ids.includes(e.id)
+                  return (
+                    <label
+                      key={e.id}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40',
+                        checked && 'bg-primary/5',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-border"
+                        checked={checked}
+                        onChange={() => toggleEmployee(e.id)}
+                      />
+                      <span className="font-medium">{e.name}</span>
+                      {e.designation?.designation && (
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {e.designation.designation}
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {!task && (
@@ -293,7 +366,7 @@ export function TaskFormModal({
             onClick={() => save.mutate()}
             disabled={!form.title.trim() || save.isPending}
           >
-            {save.isPending ? 'Saving…' : task ? 'Update' : 'Create'}
+            {save.isPending ? 'Saving…' : task ? 'Save changes' : 'Create task'}
           </Button>
         </DialogFooter>
       </DialogContent>

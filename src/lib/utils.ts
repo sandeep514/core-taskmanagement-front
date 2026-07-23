@@ -28,6 +28,58 @@ export function formatDate(date: string | Date | null | undefined, fallback = 'â
   })
 }
 
+/** Display label for task assignees (employees and/or client). */
+export function formatTaskAssignees(task: {
+  assignees?: { id: number; name: string }[] | null
+  assignee?: { id: number; name: string } | null
+  client_assignee?: { id: number; name: string } | null
+}): string {
+  if (task.client_assignee) return `Client Â· ${task.client_assignee.name}`
+  const list =
+    task.assignees && task.assignees.length > 0
+      ? task.assignees
+      : task.assignee
+        ? [task.assignee]
+        : []
+  if (!list.length) return 'Unassigned'
+  if (list.length === 1) return list[0].name
+  if (list.length === 2) return `${list[0].name} + ${list[1].name}`
+  return `${list[0].name} +${list.length - 1}`
+}
+
+export function taskAssigneeIds(task: {
+  assigned_to_ids?: number[] | null
+  assignees?: { id: number }[] | null
+  assigned_to?: number | null
+}): number[] {
+  if (task.assigned_to_ids?.length) return task.assigned_to_ids
+  if (task.assignees?.length) return task.assignees.map((a) => a.id)
+  if (task.assigned_to) return [task.assigned_to]
+  return []
+}
+
+export function isTaskAssignedToUser(
+  task: {
+    assigned_to_ids?: number[] | null
+    assignees?: { id: number }[] | null
+    assigned_to?: number | null
+    assigned_to_client?: number | null
+  },
+  userId: number,
+  role?: string,
+): boolean {
+  if (role === 'client') return task.assigned_to_client === userId
+  return taskAssigneeIds(task).includes(userId)
+}
+
+/** True when the task is assigned to the project client (not an employee). */
+export function isClientAssignedTask(task: {
+  assigned_to_client?: number | null
+  client_assignee?: { id: number } | null
+}): boolean {
+  return Boolean(task.assigned_to_client || task.client_assignee)
+}
+
 export function isOverdue(date: string | null | undefined, status?: string) {
   if (!date || status === 'done') return false
   const d = parseDate(date)

@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Briefcase, FolderKanban, LogOut, Menu, Settings, X } from 'lucide-react'
+import { Briefcase, ClipboardList, FolderKanban, LogOut, Menu, Settings, X } from 'lucide-react'
 import { useState } from 'react'
 import { cn, initials } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -57,6 +57,20 @@ export function ClientLayout() {
               My Projects
             </NavLink>
             <NavLink
+              to="/client/tasks"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-violet-50 text-violet-800'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                )
+              }
+            >
+              <ClipboardList className="h-4 w-4" />
+              My Tasks
+            </NavLink>
+            <NavLink
               to="/client/settings"
               className={({ isActive }) =>
                 cn(
@@ -112,6 +126,14 @@ export function ClientLayout() {
             >
               <FolderKanban className="h-4 w-4" />
               My Projects
+            </NavLink>
+            <NavLink
+              to="/client/tasks"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
+            >
+              <ClipboardList className="h-4 w-4" />
+              My Tasks
             </NavLink>
             <NavLink
               to="/client/settings"

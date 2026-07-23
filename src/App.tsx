@@ -18,6 +18,7 @@ import { MyProjectsPage } from '@/pages/employee/MyProjectsPage'
 import { ProjectBoardPage } from '@/pages/employee/ProjectBoardPage'
 import { ClientProjectsPage } from '@/pages/client/ClientProjectsPage'
 import { ClientProjectBoardPage } from '@/pages/client/ClientProjectBoardPage'
+import { MyAssignedTasksPage } from '@/pages/tasks/MyAssignedTasksPage'
 import { PersonalTodosPage } from '@/pages/todos/PersonalTodosPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 
@@ -56,6 +57,7 @@ export default function App() {
             <Route element={<ProtectedRoute role="employee" />}>
               <Route path="/employee" element={<EmployeeLayout />}>
                 <Route index element={<MyProjectsPage />} />
+                <Route path="tasks" element={<MyAssignedTasksPage />} />
                 <Route path="todos" element={<PersonalTodosPage />} />
                 <Route path="projects/:projectId" element={<ProjectBoardPage />} />
                 <Route path="settings" element={<SettingsPage />} />
@@ -65,6 +67,7 @@ export default function App() {
             <Route element={<ProtectedRoute role="client" />}>
               <Route path="/client" element={<ClientLayout />}>
                 <Route index element={<ClientProjectsPage />} />
+                <Route path="tasks" element={<MyAssignedTasksPage />} />
                 <Route path="projects/:projectId" element={<ClientProjectBoardPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
