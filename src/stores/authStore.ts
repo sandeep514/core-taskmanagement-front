@@ -10,6 +10,8 @@ interface AuthState {
   login: (role: UserRole, email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   setSession: (token: string, user: AuthUser) => void
+  updateUser: (user: AuthUser) => void
+  clearMustChangePassword: () => void
   hydrateToken: () => void
 }
 
@@ -35,6 +37,20 @@ export const useAuthStore = create<AuthState>()(
         set({ token, user, isAuthenticated: true })
       },
 
+      updateUser: (user) => {
+        const { token } = get()
+        if (token) persistToken(token, user)
+        set({ user })
+      },
+
+      clearMustChangePassword: () => {
+        const { user, token } = get()
+        if (!user) return
+        const next = { ...user, must_change_password: false }
+        if (token) persistToken(token, next)
+        set({ user: next })
+      },
+
       hydrateToken: () => {
         const { token, user, isAuthenticated } = get()
         if (isAuthenticated && token && user) {
@@ -49,8 +65,16 @@ export const useAuthStore = create<AuthState>()(
             : role === 'client'
               ? await api.loginClient(email, password)
               : await api.loginEmployee(email, password)
-        persistToken(res.token, res.user)
-        set({ token: res.token, user: res.user, isAuthenticated: true })
+
+        const user: AuthUser = {
+          ...res.user,
+          // Also treat a typed default password as requiring change (covers any lag).
+          must_change_password:
+            res.user.must_change_password === true || password === '123456',
+        }
+
+        persistToken(res.token, user)
+        set({ token: res.token, user, isAuthenticated: true })
       },
 
       logout: async () => {

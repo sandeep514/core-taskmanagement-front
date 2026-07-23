@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Calendar,
+  Download,
+  ExternalLink,
   FileText,
   Loader2,
   MessageSquare,
@@ -15,6 +17,7 @@ import { toast } from 'sonner'
 import {
   addTaskAttachment,
   addTaskComment,
+  attachmentUrl,
   deactivateTask,
   fetchTask,
 } from '@/lib/api'
@@ -239,18 +242,48 @@ export function TaskDetailModal({
                   <p className="text-sm text-muted-foreground">No attachments yet</p>
                 ) : (
                   <ul className="space-y-2">
-                    {task.attachments?.map((a) => (
-                      <li
-                        key={a.id}
-                        className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                      >
-                        <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
-                        <span className="truncate flex-1">{a.file_name}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {formatDate(a.created_at)}
-                        </span>
-                      </li>
-                    ))}
+                    {task.attachments?.map((a) => {
+                      const href = attachmentUrl(a)
+                      return (
+                        <li
+                          key={a.id}
+                          className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                        >
+                          <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate flex-1 font-medium text-foreground hover:text-indigo-600 hover:underline"
+                            title={a.file_name}
+                          >
+                            {a.file_name}
+                          </a>
+                          <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
+                            {formatDate(a.created_at)}
+                          </span>
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            title="View / download"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span className="sr-only">View</span>
+                          </a>
+                          <a
+                            href={href}
+                            download={a.file_name}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            title="Download"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span className="sr-only">Download</span>
+                          </a>
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
               </div>

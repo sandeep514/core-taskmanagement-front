@@ -9,6 +9,7 @@ import {
   ListTodo,
   LogOut,
   Menu,
+  Settings,
   Users,
   BadgeCheck,
   X,
@@ -16,6 +17,7 @@ import {
 import { useState } from 'react'
 import { cn, initials } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { ForceChangePasswordModal } from '@/components/auth/ForceChangePasswordModal'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -28,6 +30,7 @@ const nav = [
   { to: '/admin/clients', label: 'Clients', icon: Briefcase },
   { to: '/admin/employees', label: 'Employees', icon: Users },
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 
 export function AdminLayout() {
@@ -175,6 +178,8 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      <ForceChangePasswordModal />
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Briefcase, FolderKanban, LogOut, Menu, X } from 'lucide-react'
+import { Briefcase, FolderKanban, LogOut, Menu, Settings, X } from 'lucide-react'
 import { useState } from 'react'
 import { cn, initials } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { ForceChangePasswordModal } from '@/components/auth/ForceChangePasswordModal'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
@@ -55,6 +56,20 @@ export function ClientLayout() {
               <FolderKanban className="h-4 w-4" />
               My Projects
             </NavLink>
+            <NavLink
+              to="/client/settings"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-violet-50 text-violet-800'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                )
+              }
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </NavLink>
           </nav>
 
           <div className="flex-1" />
@@ -93,10 +108,18 @@ export function ClientLayout() {
               to="/client"
               end
               onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium bg-violet-50 text-violet-800"
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
             >
               <FolderKanban className="h-4 w-4" />
               My Projects
+            </NavLink>
+            <NavLink
+              to="/client/settings"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
+            >
+              <Settings className="h-4 w-4" />
+              Settings
             </NavLink>
           </div>
         </div>
@@ -105,6 +128,8 @@ export function ClientLayout() {
       <main className="mx-auto max-w-[1600px] p-4 lg:p-6">
         <Outlet />
       </main>
+
+      <ForceChangePasswordModal />
     </div>
   )
 }

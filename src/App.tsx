@@ -19,6 +19,7 @@ import { ProjectBoardPage } from '@/pages/employee/ProjectBoardPage'
 import { ClientProjectsPage } from '@/pages/client/ClientProjectsPage'
 import { ClientProjectBoardPage } from '@/pages/client/ClientProjectBoardPage'
 import { PersonalTodosPage } from '@/pages/todos/PersonalTodosPage'
+import { SettingsPage } from '@/pages/settings/SettingsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ export default function App() {
                 <Route path="todos" element={<PersonalTodosPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
+                <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Route>
 
@@ -56,6 +58,7 @@ export default function App() {
                 <Route index element={<MyProjectsPage />} />
                 <Route path="todos" element={<PersonalTodosPage />} />
                 <Route path="projects/:projectId" element={<ProjectBoardPage />} />
+                <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Route>
 
@@ -63,6 +66,7 @@ export default function App() {
               <Route path="/client" element={<ClientLayout />}>
                 <Route index element={<ClientProjectsPage />} />
                 <Route path="projects/:projectId" element={<ClientProjectBoardPage />} />
+                <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Route>
 

@@ -141,6 +141,18 @@ export async function fetchMe(): Promise<AuthUser> {
   return data
 }
 
+export async function changePassword(payload: {
+  current_password: string
+  password: string
+  password_confirmation: string
+}): Promise<{ message: string; user: AuthUser }> {
+  const { data } = await api.post<{ message: string; user: AuthUser }>(
+    '/change-password',
+    payload,
+  )
+  return data
+}
+
 // ─── Admin: Designations ────────────────────────────────────────────────────
 
 export async function fetchDesignations(): Promise<Designation[]> {
@@ -538,3 +550,27 @@ export async function deactivateTodo(id: number): Promise<PersonalTodo> {
 
 export { API_URL }
 export default api
+
+/** Absolute public URL for a file stored on Laravel's public disk. */
+export function storageUrl(filePath: string): string {
+  const origin = API_URL.replace(/\/api\/?$/, '')
+  return `${origin}/storage/${filePath.replace(/^\//, '')}`
+}
+
+export function attachmentUrl(attachment: {
+  url?: string | null
+  file_path: string
+}): string {
+  // Prefer file_path + API origin so a mismatched APP_URL on the server doesn't break clients.
+  if (attachment.file_path) {
+    return storageUrl(attachment.file_path)
+  }
+  if (attachment.url) {
+    if (attachment.url.startsWith('http://') || attachment.url.startsWith('https://')) {
+      return attachment.url
+    }
+    const origin = API_URL.replace(/\/api\/?$/, '')
+    return `${origin}${attachment.url.startsWith('/') ? '' : '/'}${attachment.url}`
+  }
+  return ''
+}

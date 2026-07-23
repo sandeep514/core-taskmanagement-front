@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { FileText, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { createTask, fetchProjectMembers, updateTask } from '@/lib/api'
+import { addTaskAttachment, createTask, fetchProjectMembers, updateTask } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskFormData, TaskPriority, TaskStatus, TaskType } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
@@ -42,6 +43,12 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   status,
 })
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function TaskFormModal({
   open,
   onOpenChange,
@@ -50,12 +57,14 @@ export function TaskFormModal({
   defaultStatus = 'todo',
 }: TaskFormModalProps) {
   const qc = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
   const { data: employees } = useQuery({
     queryKey: ['project-members', projectId],
     queryFn: () => fetchProjectMembers(projectId),
     enabled: open && !!projectId,
   })
   const [form, setForm] = useState<TaskFormData>(empty(defaultStatus))
+  const [files, setFiles] = useState<File[]>([])
 
   useEffect(() => {
     if (task) {
@@ -71,12 +80,19 @@ export function TaskFormModal({
     } else {
       setForm(empty(defaultStatus))
     }
+    setFiles([])
   }, [task, defaultStatus, open])
 
   const save = useMutation({
     mutationFn: async () => {
-      if (task) return updateTask(task.id, form)
-      return createTask(projectId, form)
+      if (task) {
+        return updateTask(task.id, form)
+      }
+      const created = await createTask(projectId, form)
+      for (const file of files) {
+        await addTaskAttachment(created.id, file)
+      }
+      return created
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
@@ -85,6 +101,21 @@ export function TaskFormModal({
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to save task')),
   })
+
+  const addFiles = (list: FileList | null) => {
+    if (!list?.length) return
+    const next = Array.from(list)
+    const tooBig = next.find((f) => f.size > 10 * 1024 * 1024)
+    if (tooBig) {
+      toast.error(`"${tooBig.name}" exceeds the 10 MB limit.`)
+      return
+    }
+    setFiles((prev) => [...prev, ...next])
+  }
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -200,6 +231,59 @@ export function TaskFormModal({
               />
             </div>
           </div>
+
+          {!task && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Paperclip className="h-3.5 w-3.5" />
+                Attachments
+              </Label>
+              <input
+                ref={fileRef}
+                type="file"
+                className="hidden"
+                multiple
+                onChange={(e) => {
+                  addFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+                Add files
+              </Button>
+              <p className="text-xs text-muted-foreground">Optional · max 10 MB per file</p>
+              {files.length > 0 && (
+                <ul className="space-y-1.5 pt-1">
+                  {files.map((file, index) => (
+                    <li
+                      key={`${file.name}-${file.size}-${index}`}
+                      className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                      <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
+                      <span className="truncate flex-1">{file.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {formatFileSize(file.size)}
+                      </span>
+                      <button
+                        type="button"
+                        className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        onClick={() => removeFile(index)}
+                        aria-label="Remove file"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

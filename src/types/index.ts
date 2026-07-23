@@ -19,6 +19,8 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
+  /** True when password is still the admin-set default (123456). */
+  must_change_password?: boolean
 }
 
 export interface Designation {
@@ -91,6 +93,8 @@ export interface TaskAttachment {
   file_name: string
   mime_type: string | null
   file_size?: number | null
+  /** Public storage URL (from API when available). */
+  url?: string | null
   created_at: string
   updated_at: string
 }
