@@ -18,6 +18,8 @@ import type { Task, TaskStatus } from '@/types'
 import { TASK_STATUSES } from '@/types'
 import { updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
+import { canChangeTaskStatus } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardContent } from './TaskCard'
 
@@ -39,12 +41,16 @@ function toTaskId(id: UniqueIdentifier): number {
 
 export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps) {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [items, setItems] = useState<Task[]>(tasks)
 
   // Keep a ref so drag handlers always read the latest board state
   const itemsRef = useRef(items)
   itemsRef.current = items
+
+  const canMoveTask = (task: Task | undefined | null, toStatus?: TaskStatus) =>
+    !!task && canChangeTaskStatus(task, user, toStatus)
 
   // Sync from server when not mid-drag
   const isDraggingRef = useRef(false)
@@ -101,9 +107,13 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   }
 
   function handleDragStart(event: DragStartEvent) {
-    isDraggingRef.current = true
     const taskId = toTaskId(event.active.id)
     const task = itemsRef.current.find((t) => t.id === taskId) ?? null
+    if (!canMoveTask(task)) {
+      toast.error('Only an assigned user can change the status of this task.')
+      return
+    }
+    isDraggingRef.current = true
     setActiveTask(task)
   }
 
@@ -112,12 +122,16 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
     if (!over) return
 
     const activeId = toTaskId(active.id)
+    const activeTaskItem = itemsRef.current.find((t) => t.id === activeId)
     const activeContainer = findContainer(active.id)
     const overContainer = findContainer(over.id)
 
     if (!activeContainer || !overContainer || activeContainer === overContainer) {
       return
     }
+
+    // Clients (non-assignees) may only move between client_review and done
+    if (!canMoveTask(activeTaskItem, overContainer)) return
 
     setItems((prev) => {
       const activeIndex = prev.findIndex((t) => t.id === activeId)
@@ -194,6 +208,15 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
     const current = itemsRef.current.find((t) => t.id === taskId)
 
     if (original && current && original.status !== current.status) {
+      if (!canMoveTask(original, current.status)) {
+        setItems(tasks)
+        toast.error(
+          user?.role === 'client'
+            ? 'Clients can only move tasks between Client Review and Done (unless assigned).'
+            : 'Only an assigned user can change the status of this task.',
+        )
+        return
+      }
       statusMutation.mutate({ taskId, status: current.status })
       toast.success(
         `Moved to ${TASK_STATUSES.find((s) => s.value === current.status)?.label}`,
@@ -217,6 +240,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
             status={col.value}
             tasks={columns[col.value]}
             onTaskClick={onTaskClick}
+            canMoveTask={canMoveTask}
           />
         ))}
       </div>

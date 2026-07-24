@@ -72,6 +72,78 @@ export function isTaskAssignedToUser(
   return taskAssigneeIds(task).includes(userId)
 }
 
+const CLIENT_REVIEW_STATUSES = ['client_review', 'done'] as const
+
+/**
+ * Who may change task status:
+ * - Admin: always
+ * - Employee: only if they are an assignee
+ * - Client: if assigned (any status), OR when status is client_review / done
+ *   (then only between those two)
+ */
+export function canChangeTaskStatus(
+  task: {
+    assigned_to_ids?: number[] | null
+    assignees?: { id: number }[] | null
+    assigned_to?: number | null
+    assigned_to_client?: number | null
+    status?: string | null
+  },
+  user: { id: number; role?: string } | null | undefined,
+  newStatus?: string | null,
+): boolean {
+  if (!user) return false
+  if (user.role === 'admin') return true
+  if (user.role === 'employee') {
+    return isTaskAssignedToUser(task, user.id, user.role)
+  }
+  if (user.role === 'client') {
+    if (isTaskAssignedToUser(task, user.id, 'client')) return true
+    const current = task.status ?? ''
+    if (!CLIENT_REVIEW_STATUSES.includes(current as (typeof CLIENT_REVIEW_STATUSES)[number])) {
+      return false
+    }
+    if (
+      newStatus != null &&
+      !CLIENT_REVIEW_STATUSES.includes(newStatus as (typeof CLIENT_REVIEW_STATUSES)[number])
+    ) {
+      return false
+    }
+    return true
+  }
+  return false
+}
+
+/** Status options a user may pick for this task (null = all statuses). */
+export function allowedTaskStatusesForUser(
+  task: {
+    assigned_to_ids?: number[] | null
+    assignees?: { id: number }[] | null
+    assigned_to?: number | null
+    assigned_to_client?: number | null
+    status?: string | null
+  },
+  user: { id: number; role?: string } | null | undefined,
+): string[] | null {
+  if (!user) return []
+  if (user.role === 'admin') return null
+  if (user.role === 'employee') {
+    return isTaskAssignedToUser(task, user.id, 'employee') ? null : []
+  }
+  if (user.role === 'client') {
+    if (isTaskAssignedToUser(task, user.id, 'client')) return null
+    if (
+      CLIENT_REVIEW_STATUSES.includes(
+        (task.status ?? '') as (typeof CLIENT_REVIEW_STATUSES)[number],
+      )
+    ) {
+      return [...CLIENT_REVIEW_STATUSES]
+    }
+    return []
+  }
+  return []
+}
+
 /** True when the task is assigned to the project client (not an employee). */
 export function isClientAssignedTask(task: {
   assigned_to_client?: number | null

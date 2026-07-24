@@ -11,11 +11,15 @@ interface TaskCardContentProps extends React.HTMLAttributes<HTMLDivElement> {
   task: Task
   isDragging?: boolean
   isOverlay?: boolean
+  dragDisabled?: boolean
 }
 
 /** Presentational card — safe for DragOverlay (no useSortable). */
 export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
-  function TaskCardContent({ task, className, isDragging, isOverlay, style, ...props }, ref) {
+  function TaskCardContent(
+    { task, className, isDragging, isOverlay, dragDisabled, style, ...props },
+    ref,
+  ) {
     const priority = TASK_PRIORITIES.find((p) => p.value === task.priority)
     const taskType = TASK_TYPES.find((t) => t.value === (task.task_type ?? 'general'))
     const overdue = isOverdue(task.deadline, task.status)
@@ -29,7 +33,11 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
           'rounded-xl border border-border bg-card p-3 shadow-sm select-none touch-none',
           isDragging && !isOverlay && 'opacity-30',
           isOverlay && 'shadow-xl ring-2 ring-primary/20 rotate-1 cursor-grabbing',
-          !isOverlay && !isDragging && 'hover:shadow-md cursor-grab active:cursor-grabbing',
+          !isOverlay &&
+            !isDragging &&
+            (dragDisabled
+              ? 'hover:shadow-md cursor-pointer'
+              : 'hover:shadow-md cursor-grab active:cursor-grabbing'),
           overdue && 'border-l-4 border-l-red-500',
           clientAssigned && !overdue && 'border-l-4 border-l-violet-500',
           clientAssigned && 'bg-violet-50/80 border-violet-200 ring-1 ring-violet-100',
@@ -141,9 +149,10 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
 interface TaskCardProps {
   task: Task
   onClick: () => void
+  dragDisabled?: boolean
 }
 
-export function TaskCard({ task, onClick }: TaskCardProps) {
+export function TaskCard({ task, onClick, dragDisabled = false }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -153,6 +162,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
     isDragging,
   } = useSortable({
     id: task.id,
+    disabled: dragDisabled,
     data: {
       type: 'task',
       task,
@@ -171,9 +181,10 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       task={task}
       style={style}
       isDragging={isDragging}
+      dragDisabled={dragDisabled}
       onClick={onClick}
       {...attributes}
-      {...listeners}
+      {...(dragDisabled ? {} : listeners)}
     />
   )
 }

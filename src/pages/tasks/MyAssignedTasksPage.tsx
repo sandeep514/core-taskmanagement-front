@@ -7,7 +7,14 @@ import { fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskStatus } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
-import { cn, formatDate, isClientAssignedTask, isOverdue } from '@/lib/utils'
+import {
+  allowedTaskStatusesForUser,
+  canChangeTaskStatus,
+  cn,
+  formatDate,
+  isClientAssignedTask,
+  isOverdue,
+} from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -27,9 +34,9 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 
 export function MyAssignedTasksPage() {
-  const role = useAuthStore((s) => s.user?.role)
+  const user = useAuthStore((s) => s.user)
+  const role = user?.role
   const projectsBase = role === 'client' ? '/client' : '/employee'
-  const canChangeStatus = role === 'employee' || role === 'client'
   const qc = useQueryClient()
 
   const [projectFilter, setProjectFilter] = useState<string>('all')
@@ -326,12 +333,18 @@ export function MyAssignedTasksPage() {
                           )}
                         </td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                          {canChangeStatus ? (
+                          {canChangeTaskStatus(task, user) ? (
                             <Select
                               value={task.status}
                               disabled={statusBusy}
                               onValueChange={(value) => {
                                 if (value === task.status) return
+                                if (!canChangeTaskStatus(task, user, value)) {
+                                  toast.error(
+                                    'Clients can only set Client Review or Done on this task.',
+                                  )
+                                  return
+                                }
                                 statusMutation.mutate({
                                   taskId: task.id,
                                   status: value as TaskStatus,
@@ -347,7 +360,14 @@ export function MyAssignedTasksPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {TASK_STATUSES.map((s) => (
+                                {(allowedTaskStatusesForUser(task, user) === null
+                                  ? TASK_STATUSES
+                                  : TASK_STATUSES.filter((s) =>
+                                      (allowedTaskStatusesForUser(task, user) ?? []).includes(
+                                        s.value,
+                                      ),
+                                    )
+                                ).map((s) => (
                                   <SelectItem key={s.value} value={s.value}>
                                     {s.label}
                                   </SelectItem>

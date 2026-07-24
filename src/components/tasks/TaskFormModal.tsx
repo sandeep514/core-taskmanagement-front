@@ -4,7 +4,13 @@ import { FileText, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { addTaskAttachment, createTask, fetchProject, fetchProjectMembers, updateTask } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
-import { cn, taskAssigneeIds } from '@/lib/utils'
+import {
+  allowedTaskStatusesForUser,
+  canChangeTaskStatus,
+  cn,
+  taskAssigneeIds,
+} from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import type { Task, TaskFormData, TaskPriority, TaskStatus, TaskType } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -60,6 +66,7 @@ export function TaskFormModal({
   defaultStatus = 'todo',
 }: TaskFormModalProps) {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
   const fileRef = useRef<HTMLInputElement>(null)
   const { data: employees } = useQuery({
     queryKey: ['project-members', projectId],
@@ -124,15 +131,27 @@ export function TaskFormModal({
         return updateTask(task.id, form)
       }
       const created = await createTask(projectId, form)
-      for (const file of files) {
-        await addTaskAttachment(created.id, file)
+      // Attach files to every generated task (one per assignee when multi-assign).
+      for (const createdTask of created) {
+        for (const file of files) {
+          await addTaskAttachment(createdTask.id, file)
+        }
       }
       return created
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
-      toast.success(task ? 'Task updated' : 'Task created')
+      if (task) {
+        toast.success('Task updated')
+      } else {
+        const count = Array.isArray(result) ? result.length : 1
+        toast.success(
+          count > 1
+            ? `Created ${count} tasks (one per assignee)`
+            : 'Task created',
+        )
+      }
       onOpenChange(false)
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to save task')),
@@ -155,6 +174,12 @@ export function TaskFormModal({
 
   const isUnassigned = form.assigned_to_ids.length === 0 && form.assigned_to_client === ''
   const activeEmployees = (employees ?? []).filter((e) => e.status === 'active')
+  const statusLocked = Boolean(task) && !canChangeTaskStatus(task!, user)
+  const allowedStatuses = task ? allowedTaskStatusesForUser(task, user) : null
+  const statusOptions =
+    allowedStatuses === null
+      ? TASK_STATUSES
+      : TASK_STATUSES.filter((s) => allowedStatuses.includes(s.value))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -223,18 +248,33 @@ export function TaskFormModal({
               <Select
                 value={form.status}
                 onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}
+                disabled={statusLocked}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TASK_STATUSES.map((s) => (
+                  {statusOptions.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {statusLocked && (
+                <p className="text-xs text-muted-foreground">
+                  Only an assigned user can change status, or a client may move
+                  Client Review ↔ Done.
+                </p>
+              )}
+              {!statusLocked &&
+                allowedStatuses &&
+                allowedStatuses.length > 0 &&
+                allowedStatuses.length < TASK_STATUSES.length && (
+                  <p className="text-xs text-muted-foreground">
+                    As a client you can set Client Review or Done on this task.
+                  </p>
+                )}
             </div>
             <div className="space-y-2">
               <Label>Deadline</Label>
@@ -267,7 +307,8 @@ export function TaskFormModal({
           <div className="space-y-2">
             <Label>Assignees</Label>
             <p className="text-xs text-muted-foreground">
-              Select one or more employees, or the client (not both).
+              Select one or more employees, or the client (not both). Choosing multiple
+              employees creates a separate task for each person.
             </p>
             <div className="flex flex-wrap gap-2">
               <button

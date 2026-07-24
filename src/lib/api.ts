@@ -471,12 +471,23 @@ export async function fetchTask(taskId: number): Promise<Task> {
   return data
 }
 
-export async function createTask(projectId: number, payload: TaskFormData): Promise<Task> {
-  const { data } = await api.post<Task>(`/${portalBase()}/tasks`, {
-    ...normalizeTaskPayload(payload),
-    project_id: projectId,
-  })
-  return data
+/**
+ * Create task(s). When multiple employees are assigned, the API creates
+ * one task per person and returns `{ tasks, count }`.
+ */
+export async function createTask(projectId: number, payload: TaskFormData): Promise<Task[]> {
+  const { data } = await api.post<Task | Task[] | { tasks: Task[]; count: number }>(
+    `/${portalBase()}/tasks`,
+    {
+      ...normalizeTaskPayload(payload),
+      project_id: projectId,
+    },
+  )
+  if (Array.isArray(data)) return data
+  if (data && typeof data === 'object' && 'tasks' in data && Array.isArray(data.tasks)) {
+    return data.tasks
+  }
+  return [data as Task]
 }
 
 export async function updateTask(
