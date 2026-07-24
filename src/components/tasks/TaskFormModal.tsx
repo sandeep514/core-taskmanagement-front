@@ -38,6 +38,7 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   title: '',
   details: '',
   deadline: '',
+  estimate_hours: '',
   assigned_to_ids: [],
   assigned_to_client: '',
   priority: 'medium',
@@ -79,6 +80,10 @@ export function TaskFormModal({
         title: task.title,
         details: task.details || '',
         deadline: task.deadline || '',
+        estimate_hours:
+          task.estimate_hours === null || task.estimate_hours === undefined
+            ? ''
+            : task.estimate_hours,
         assigned_to_ids: taskAssigneeIds(task),
         assigned_to_client: task.assigned_to_client ?? '',
         priority: task.priority,
@@ -212,7 +217,7 @@ export function TaskFormModal({
               </Select>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid sm:grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label>Status</Label>
               <Select
@@ -237,6 +242,24 @@ export function TaskFormModal({
                 type="date"
                 value={form.deadline}
                 onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Estimate (hours)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.5}
+                inputMode="decimal"
+                placeholder="e.g. 4"
+                value={form.estimate_hours === '' ? '' : form.estimate_hours}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setForm({
+                    ...form,
+                    estimate_hours: v === '' ? '' : Number(v),
+                  })
+                }}
               />
             </div>
           </div>

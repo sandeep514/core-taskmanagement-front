@@ -57,6 +57,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   const columns = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = {
       todo: [],
+      discussion: [],
       in_progress: [],
       dev_done: [],
       testing: [],

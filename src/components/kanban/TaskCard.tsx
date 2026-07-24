@@ -1,7 +1,7 @@
 import { forwardRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Briefcase, Calendar, MessageSquare, Paperclip } from 'lucide-react'
+import { Briefcase, Calendar, Clock, MessageSquare, Paperclip } from 'lucide-react'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_TYPES } from '@/types'
 import { cn, formatDate, formatTaskAssignees, initials, isClientAssignedTask, isOverdue } from '@/lib/utils'
@@ -75,6 +75,12 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
             >
               <Calendar className="h-3 w-3" />
               {formatDate(task.deadline)}
+            </span>
+          )}
+          {task.estimate_hours != null && task.estimate_hours !== undefined && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+              <Clock className="h-3 w-3" />
+              {task.estimate_hours}h
             </span>
           )}
         </div>

@@ -1,33 +1,42 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, ClipboardList, ExternalLink } from 'lucide-react'
-import { fetchMyAssignedTasks } from '@/lib/api'
-import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES } from '@/types'
+import { toast } from 'sonner'
+import { fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
+import { getApiError } from '@/lib/api-error'
+import type { Task, TaskStatus } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import { cn, formatDate, isClientAssignedTask, isOverdue } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
-
-type StatusFilter = 'open' | 'all' | 'done'
-
-const statusFilters: { value: StatusFilter; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'done', label: 'Done' },
-  { value: 'all', label: 'All' },
-]
 
 export function MyAssignedTasksPage() {
   const role = useAuthStore((s) => s.user?.role)
   const projectsBase = role === 'client' ? '/client' : '/employee'
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const canChangeStatus = role === 'employee' || role === 'client'
+  const qc = useQueryClient()
+
+  const [projectFilter, setProjectFilter] = useState<string>('all')
+  const [priorityFilter, setPriorityFilter] = useState<string>('all')
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+
   const [detailOpen, setDetailOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
@@ -39,12 +48,30 @@ export function MyAssignedTasksPage() {
     queryFn: fetchMyAssignedTasks,
   })
 
+  const projectOptions = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const task of data ?? []) {
+      if (!map.has(task.project_id)) {
+        map.set(
+          task.project_id,
+          task.project?.project_name ?? `Project #${task.project_id}`,
+        )
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [data])
+
   const filtered = useMemo(() => {
-    const list = data ?? []
-    if (statusFilter === 'open') return list.filter((t) => t.status !== 'done')
-    if (statusFilter === 'done') return list.filter((t) => t.status === 'done')
-    return list
-  }, [data, statusFilter])
+    return (data ?? []).filter((task) => {
+      if (projectFilter !== 'all' && task.project_id !== Number(projectFilter)) return false
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false
+      if (taskTypeFilter !== 'all' && (task.task_type ?? 'general') !== taskTypeFilter) return false
+      if (statusFilter !== 'all' && task.status !== statusFilter) return false
+      return true
+    })
+  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter])
 
   const stats = useMemo(() => {
     const list = data ?? []
@@ -55,6 +82,29 @@ export function MyAssignedTasksPage() {
       urgent: list.filter((t) => t.priority === 'urgent' && t.status !== 'done').length,
     }
   }, [data])
+
+  const hasActiveFilters =
+    projectFilter !== 'all' ||
+    priorityFilter !== 'all' ||
+    taskTypeFilter !== 'all' ||
+    statusFilter !== 'all'
+
+  const clearFilters = () => {
+    setProjectFilter('all')
+    setPriorityFilter('all')
+    setTaskTypeFilter('all')
+    setStatusFilter('all')
+  }
+
+  const statusMutation = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: number; status: TaskStatus }) =>
+      updateTaskStatus(taskId, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+      toast.success('Status updated')
+    },
+    onError: (err) => toast.error(getApiError(err, 'Failed to update status')),
+  })
 
   const openDetail = (task: Task) => {
     setSelectedTaskId(task.id)
@@ -89,25 +139,88 @@ export function MyAssignedTasksPage() {
         description="Tasks assigned to you across all projects, ordered by priority and deadline."
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
-          {statusFilters.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setStatusFilter(f.value)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                statusFilter === f.value
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5 min-w-[180px]">
+            <Label className="text-xs text-muted-foreground">Project</Label>
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="All projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {projectOptions.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5 min-w-[140px]">
+            <Label className="text-xs text-muted-foreground">Priority</Label>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="All priorities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All priorities</SelectItem>
+                {TASK_PRIORITIES.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5 min-w-[150px]">
+            <Label className="text-xs text-muted-foreground">Task type</Label>
+            <Select value={taskTypeFilter} onValueChange={setTaskTypeFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="All task types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All task types</SelectItem>
+                {TASK_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5 min-w-[160px]">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {TASK_STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasActiveFilters && (
+            <Button type="button" variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
         </div>
+
         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+          <Badge variant="secondary">
+            {filtered.length}
+            {hasActiveFilters ? ` of ${stats.total}` : ''} shown
+          </Badge>
           <Badge variant="secondary">{stats.open} open</Badge>
           {stats.urgent > 0 && (
             <Badge className="bg-red-100 text-red-700 hover:bg-red-100">{stats.urgent} urgent</Badge>
@@ -125,9 +238,16 @@ export function MyAssignedTasksPage() {
           icon={ClipboardList}
           title="No assigned tasks"
           description={
-            statusFilter === 'open'
-              ? 'You have no open tasks assigned to you right now.'
-              : 'No tasks match this filter.'
+            hasActiveFilters
+              ? 'No tasks match these filters.'
+              : 'You have no tasks assigned to you right now.'
+          }
+          action={
+            hasActiveFilters ? (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -137,6 +257,7 @@ export function MyAssignedTasksPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="w-14 px-4 py-3 font-medium">#</th>
                     <th className="px-4 py-3 font-medium">Task</th>
                     <th className="px-4 py-3 font-medium">Project</th>
                     <th className="px-4 py-3 font-medium">Priority</th>
@@ -146,11 +267,13 @@ export function MyAssignedTasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((task) => {
+                  {filtered.map((task, index) => {
                     const priority = TASK_PRIORITIES.find((p) => p.value === task.priority)
-                    const status = TASK_STATUSES.find((s) => s.value === task.status)
                     const overdue = isOverdue(task.deadline, task.status)
                     const clientAssigned = isClientAssignedTask(task)
+                    const statusBusy =
+                      statusMutation.isPending &&
+                      statusMutation.variables?.taskId === task.id
 
                     return (
                       <tr
@@ -161,6 +284,9 @@ export function MyAssignedTasksPage() {
                         )}
                         onClick={() => openDetail(task)}
                       >
+                        <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                          {index + 1}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-start gap-2">
                             {clientAssigned && (
@@ -199,15 +325,43 @@ export function MyAssignedTasksPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          {status && (
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          {canChangeStatus ? (
+                            <Select
+                              value={task.status}
+                              disabled={statusBusy}
+                              onValueChange={(value) => {
+                                if (value === task.status) return
+                                statusMutation.mutate({
+                                  taskId: task.id,
+                                  status: value as TaskStatus,
+                                })
+                              }}
+                            >
+                              <SelectTrigger
+                                className={cn(
+                                  'h-8 w-[150px] border text-xs font-medium',
+                                  TASK_STATUSES.find((s) => s.value === task.status)?.color,
+                                )}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TASK_STATUSES.map((s) => (
+                                  <SelectItem key={s.value} value={s.value}>
+                                    {s.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
                             <span
                               className={cn(
                                 'inline-flex rounded-full border px-2 py-0.5 text-xs font-medium',
-                                status.color,
+                                TASK_STATUSES.find((s) => s.value === task.status)?.color,
                               )}
                             >
-                              {status.label}
+                              {TASK_STATUSES.find((s) => s.value === task.status)?.label}
                             </span>
                           )}
                         </td>

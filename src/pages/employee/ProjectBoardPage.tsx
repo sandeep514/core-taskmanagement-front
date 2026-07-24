@@ -10,6 +10,12 @@ import { Badge } from '@/components/ui/badge'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
+import {
+  TaskBoardFilters,
+  filterTasksByPriorityAndType,
+  type PriorityFilter,
+  type TaskTypeFilter,
+} from '@/components/tasks/TaskBoardFilters'
 import { formatDate, cn, isTaskAssignedToUser } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -25,6 +31,8 @@ export function ProjectBoardPage() {
   const id = Number(projectId)
   const user = useAuthStore((s) => s.user)
   const [taskFilter, setTaskFilter] = useState<TaskScopeFilter>('all')
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
 
   const {
     data: project,
@@ -47,10 +55,12 @@ export function ProjectBoardPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
   const filteredTasks = useMemo(() => {
-    const list = tasks ?? []
-    if (taskFilter !== 'mine' || !user?.id) return list
-    return list.filter((t) => isTaskAssignedToUser(t, user.id, 'employee'))
-  }, [tasks, taskFilter, user?.id])
+    let list = tasks ?? []
+    if (taskFilter === 'mine' && user?.id) {
+      list = list.filter((t) => isTaskAssignedToUser(t, user.id, 'employee'))
+    }
+    return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter)
+  }, [tasks, taskFilter, user?.id, priorityFilter, taskTypeFilter])
 
   if (loadingProjects || loadingTasks) return <PageLoader />
 
@@ -125,6 +135,12 @@ export function ProjectBoardPage() {
               </button>
             ))}
           </div>
+          <TaskBoardFilters
+            priority={priorityFilter}
+            taskType={taskTypeFilter}
+            onPriorityChange={setPriorityFilter}
+            onTaskTypeChange={setTaskTypeFilter}
+          />
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
             New Task

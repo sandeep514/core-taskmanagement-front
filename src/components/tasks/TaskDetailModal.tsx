@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Calendar,
+  Clock,
+  Copy,
   Download,
   ExternalLink,
   FileText,
@@ -37,6 +39,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { PageLoader } from '@/components/ui/loading'
+import { CopyTaskDialog } from '@/components/tasks/CopyTaskDialog'
 
 interface TaskDetailModalProps {
   open: boolean
@@ -56,6 +59,7 @@ export function TaskDetailModal({
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [comment, setComment] = useState('')
+  const [copyOpen, setCopyOpen] = useState(false)
 
   const { data: task, isLoading } = useQuery({
     queryKey: ['task', taskId],
@@ -104,6 +108,7 @@ export function TaskDetailModal({
   const clientAssigned = task ? isClientAssignedTask(task) : false
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
         {isLoading || !task ? (
@@ -154,9 +159,23 @@ export function TaskDetailModal({
                         {overdue && ' · Overdue'}
                       </span>
                     )}
+                    {task.estimate_hours != null && task.estimate_hours !== undefined && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                        <Clock className="h-3 w-3" />
+                        {task.estimate_hours}h estimate
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex flex-wrap gap-1 shrink-0 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCopyOpen(true)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -392,5 +411,13 @@ export function TaskDetailModal({
         )}
       </DialogContent>
     </Dialog>
+
+    <CopyTaskDialog
+      open={copyOpen}
+      onOpenChange={setCopyOpen}
+      task={task ?? null}
+      sourceProjectId={projectId}
+    />
+    </>
   )
 }

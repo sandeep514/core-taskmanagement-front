@@ -86,10 +86,17 @@ function emptyToNull(value: string | number | null | undefined): string | number
 }
 
 function normalizeTaskPayload(payload: Partial<TaskFormData>) {
+  const estimate =
+    payload.estimate_hours === '' || payload.estimate_hours === undefined
+      ? null
+      : Number(payload.estimate_hours)
+
   return {
     title: payload.title,
     details: emptyToNull(payload.details ?? '') as string | null,
     deadline: emptyToNull(payload.deadline ?? '') as string | null,
+    estimate_hours:
+      estimate === null || Number.isNaN(estimate) ? null : estimate,
     assigned_to_ids: Array.isArray(payload.assigned_to_ids)
       ? payload.assigned_to_ids.map(Number)
       : [],
@@ -507,6 +514,28 @@ export async function addTaskAttachment(taskId: number, file: File): Promise<voi
   const form = new FormData()
   form.append('file', file)
   await api.post(`/${portalBase()}/tasks/${taskId}/attachments`, form)
+}
+
+/** Copy a task into the same project or another accessible project. */
+export async function copyTask(
+  taskId: number,
+  projectId: number,
+  options?: { include_attachments?: boolean },
+): Promise<Task> {
+  const { data } = await api.post<Task>(`/${portalBase()}/tasks/${taskId}/copy`, {
+    project_id: projectId,
+    include_attachments: options?.include_attachments ?? true,
+  })
+  return data
+}
+
+/** Projects the current user can copy tasks into (role-aware). */
+export async function fetchCopyTargetProjects(): Promise<Project[]> {
+  const base = portalBase()
+  if (base === 'admin') {
+    return fetchProjects()
+  }
+  return fetchMyProjects()
 }
 
 // ─── Personal todos (admin + employee) ──────────────────────────────────────

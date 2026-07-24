@@ -2,6 +2,7 @@ export type UserRole = 'admin' | 'employee' | 'client'
 
 export type TaskStatus =
   | 'todo'
+  | 'discussion'
   | 'in_progress'
   | 'dev_done'
   | 'testing'
@@ -117,6 +118,8 @@ export interface Task {
   details: string | null
   task_created_on: string
   deadline: string | null
+  /** Estimated effort in hours (optional). */
+  estimate_hours: number | null
   actual_complete_on: string | null
   /** @deprecated Prefer assigned_to_ids / assignees */
   assigned_to: number | null
@@ -154,6 +157,7 @@ export interface DashboardStats {
 
 export const TASK_STATUSES: { value: TaskStatus; label: string; color: string }[] = [
   { value: 'todo', label: 'To Do', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  { value: 'discussion', label: 'Discussion', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },
   { value: 'in_progress', label: 'In Progress', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   { value: 'dev_done', label: 'Dev Done', color: 'bg-violet-50 text-violet-700 border-violet-200' },
   { value: 'testing', label: 'Testing', color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -196,6 +200,8 @@ export interface TaskFormData {
   title: string
   details: string
   deadline: string
+  /** Empty string when unset in the form; API receives number | null. */
+  estimate_hours: number | ''
   assigned_to_ids: number[]
   assigned_to_client: number | ''
   priority: TaskPriority
