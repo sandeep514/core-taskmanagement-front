@@ -7,7 +7,9 @@ import { getApiError } from '@/lib/api-error'
 import {
   allowedTaskStatusesForUser,
   canChangeTaskStatus,
+  canEditTask,
   cn,
+  formatTaskCreator,
   taskAssigneeIds,
 } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -103,6 +105,18 @@ export function TaskFormModal({
     setFiles([])
   }, [task, defaultStatus, open])
 
+  // Create mode: if the project has exactly one employee, select them by default
+  useEffect(() => {
+    if (!open || task) return
+    const active = (employees ?? []).filter((e) => e.status !== 'inactive')
+    if (active.length !== 1) return
+    const onlyId = active[0].id
+    setForm((f) => {
+      if (f.assigned_to_ids.length > 0 || f.assigned_to_client !== '') return f
+      return { ...f, assigned_to_ids: [onlyId], assigned_to_client: '' }
+    })
+  }, [open, task, employees])
+
   const clearAssignees = () => {
     setForm((f) => ({ ...f, assigned_to_ids: [], assigned_to_client: '' }))
   }
@@ -128,6 +142,9 @@ export function TaskFormModal({
   const save = useMutation({
     mutationFn: async () => {
       if (task) {
+        if (!canEditTask(task, user)) {
+          throw new Error('Only the person who created this task can edit it.')
+        }
         return updateTask(task.id, form)
       }
       const created = await createTask(projectId, form)
@@ -175,6 +192,7 @@ export function TaskFormModal({
   const isUnassigned = form.assigned_to_ids.length === 0 && form.assigned_to_client === ''
   const activeEmployees = (employees ?? []).filter((e) => e.status === 'active')
   const statusLocked = Boolean(task) && !canChangeTaskStatus(task!, user)
+  const fieldsLocked = Boolean(task) && !canEditTask(task, user)
   const allowedStatuses = task ? allowedTaskStatusesForUser(task, user) : null
   const statusOptions =
     allowedStatuses === null
@@ -187,6 +205,17 @@ export function TaskFormModal({
         <DialogHeader>
           <DialogTitle>{task ? 'Edit Task' : 'Create Task'}</DialogTitle>
         </DialogHeader>
+        {task && fieldsLocked ? (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Only <span className="font-semibold">{formatTaskCreator(task)}</span> can edit
+            this task. You can still change status from the board or detail view.
+          </p>
+        ) : task ? (
+          <p className="text-xs text-muted-foreground">
+            You created this task, so you can edit its fields. Anyone on the project can
+            move status.
+          </p>
+        ) : null}
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Title</Label>
@@ -194,6 +223,7 @@ export function TaskFormModal({
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="What needs to be done?"
+              disabled={fieldsLocked}
             />
           </div>
           <div className="space-y-2">
@@ -202,6 +232,7 @@ export function TaskFormModal({
               value={form.details}
               onChange={(e) => setForm({ ...form, details: e.target.value })}
               placeholder="Description, acceptance criteria…"
+              disabled={fieldsLocked}
             />
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
@@ -210,6 +241,7 @@ export function TaskFormModal({
               <Select
                 value={form.task_type}
                 onValueChange={(v) => setForm({ ...form, task_type: v as TaskType })}
+                disabled={fieldsLocked}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -228,6 +260,7 @@ export function TaskFormModal({
               <Select
                 value={form.priority}
                 onValueChange={(v) => setForm({ ...form, priority: v as TaskPriority })}
+                disabled={fieldsLocked}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -263,18 +296,9 @@ export function TaskFormModal({
               </Select>
               {statusLocked && (
                 <p className="text-xs text-muted-foreground">
-                  Only an assigned user can change status, or a client may move
-                  Client Review ↔ Done.
+                  You cannot change status on this task.
                 </p>
               )}
-              {!statusLocked &&
-                allowedStatuses &&
-                allowedStatuses.length > 0 &&
-                allowedStatuses.length < TASK_STATUSES.length && (
-                  <p className="text-xs text-muted-foreground">
-                    As a client you can set Client Review or Done on this task.
-                  </p>
-                )}
             </div>
             <div className="space-y-2">
               <Label>Deadline</Label>
@@ -282,6 +306,7 @@ export function TaskFormModal({
                 type="date"
                 value={form.deadline}
                 onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                disabled={fieldsLocked}
               />
             </div>
             <div className="space-y-2">
@@ -300,11 +325,12 @@ export function TaskFormModal({
                     estimate_hours: v === '' ? '' : Number(v),
                   })
                 }}
+                disabled={fieldsLocked}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className={cn('space-y-2', fieldsLocked && 'opacity-60 pointer-events-none')}>
             <Label>Assignees</Label>
             <p className="text-xs text-muted-foreground">
               Select one or more employees, or the client (not both). Choosing multiple
@@ -428,7 +454,7 @@ export function TaskFormModal({
           </Button>
           <Button
             onClick={() => save.mutate()}
-            disabled={!form.title.trim() || save.isPending}
+            disabled={!form.title.trim() || save.isPending || fieldsLocked}
           >
             {save.isPending ? 'Saving…' : task ? 'Save changes' : 'Create task'}
           </Button>

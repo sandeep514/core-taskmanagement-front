@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { HydrationGate } from '@/components/auth/HydrationGate'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RealtimeProvider } from '@/components/realtime/RealtimeProvider'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { EmployeeLayout } from '@/components/layout/EmployeeLayout'
 import { ClientLayout } from '@/components/layout/ClientLayout'
@@ -36,6 +37,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HydrationGate>
+        <RealtimeProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -77,6 +79,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
+        </RealtimeProvider>
       </HydrationGate>
       <Toaster position="top-right" richColors closeButton />
     </QueryClientProvider>

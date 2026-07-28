@@ -18,6 +18,7 @@ import {
 } from '@/components/tasks/TaskBoardFilters'
 import { formatDate, cn, isTaskAssignedToUser } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { useProjectTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 type TaskScopeFilter = 'mine' | 'all'
 
@@ -33,6 +34,9 @@ export function ProjectBoardPage() {
   const [taskFilter, setTaskFilter] = useState<TaskScopeFilter>('all')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
+
+  // Live updates for all viewers on this board
+  useProjectTasksRealtime(id)
 
   const {
     data: project,

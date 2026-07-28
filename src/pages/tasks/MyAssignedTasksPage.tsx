@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, ClipboardList, ExternalLink } from 'lucide-react'
+import { CalendarClock, ClipboardList, ExternalLink, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import { fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
+import { fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskStatus } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
@@ -12,6 +12,8 @@ import {
   canChangeTaskStatus,
   cn,
   formatDate,
+  formatTaskCreatedAt,
+  formatTaskCreator,
   isClientAssignedTask,
   isOverdue,
 } from '@/lib/utils'
@@ -24,6 +26,13 @@ import { Label } from '@/components/ui/label'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,6 +41,7 @@ import {
 } from '@/components/ui/select'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
+import { useProjectsTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 export function MyAssignedTasksPage() {
   const user = useAuthStore((s) => s.user)
@@ -50,10 +60,47 @@ export function MyAssignedTasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [activeProjectId, setActiveProjectId] = useState<number | null>(null)
 
+  // Create-from-My-Tasks: pick project first
+  const [pickProjectOpen, setPickProjectOpen] = useState(false)
+  const [newTaskProjectId, setNewTaskProjectId] = useState<string>('')
+
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-assigned-tasks'],
     queryFn: fetchMyAssignedTasks,
   })
+
+  const { data: allProjects, isLoading: loadingProjects } = useQuery({
+    queryKey: ['copy-target-projects'],
+    queryFn: fetchCopyTargetProjects,
+    enabled: pickProjectOpen,
+  })
+
+  const creatableProjects = useMemo(() => {
+    let list = (allProjects ?? []).filter((p) => p.status === 'active')
+    if (role === 'client') {
+      list = list.filter((p) => p.can_client_add_tasks)
+    }
+    return list.sort((a, b) => a.project_name.localeCompare(b.project_name))
+  }, [allProjects, role])
+
+  useEffect(() => {
+    if (!pickProjectOpen) return
+    if (creatableProjects.length === 0) {
+      setNewTaskProjectId('')
+      return
+    }
+    // Prefer currently filtered project if available
+    if (
+      projectFilter !== 'all' &&
+      creatableProjects.some((p) => String(p.id) === projectFilter)
+    ) {
+      setNewTaskProjectId(projectFilter)
+      return
+    }
+    if (!newTaskProjectId || !creatableProjects.some((p) => String(p.id) === newTaskProjectId)) {
+      setNewTaskProjectId(String(creatableProjects[0].id))
+    }
+  }, [pickProjectOpen, creatableProjects, projectFilter, newTaskProjectId])
 
   const projectOptions = useMemo(() => {
     const map = new Map<number, string>()
@@ -69,6 +116,9 @@ export function MyAssignedTasksPage() {
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [data])
+
+  // Live updates for every project that has a task on this list
+  useProjectsTasksRealtime(projectOptions.map((p) => p.id))
 
   const filtered = useMemo(() => {
     return (data ?? []).filter((task) => {
@@ -126,6 +176,23 @@ export function MyAssignedTasksPage() {
     setFormOpen(true)
   }
 
+  const openCreate = () => {
+    setEditingTask(null)
+    setPickProjectOpen(true)
+  }
+
+  const confirmCreateProject = () => {
+    const id = Number(newTaskProjectId)
+    if (!id) {
+      toast.error('Select a project first.')
+      return
+    }
+    setPickProjectOpen(false)
+    setActiveProjectId(id)
+    setEditingTask(null)
+    setFormOpen(true)
+  }
+
   if (isLoading) return <PageLoader />
 
   if (isError) {
@@ -144,6 +211,12 @@ export function MyAssignedTasksPage() {
       <PageHeader
         title="My Tasks"
         description="Tasks assigned to you across all projects, ordered by priority and deadline."
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            Add new task
+          </Button>
+        }
       />
 
       <div className="mb-5 space-y-3">
@@ -254,7 +327,12 @@ export function MyAssignedTasksPage() {
               <Button variant="outline" size="sm" onClick={clearFilters}>
                 Clear filters
               </Button>
-            ) : undefined
+            ) : (
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                Add new task
+              </Button>
+            )
           }
         />
       ) : (
@@ -264,9 +342,11 @@ export function MyAssignedTasksPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="w-14 px-4 py-3 font-medium">#</th>
+                    <th className="w-16 px-4 py-3 font-medium">ID</th>
                     <th className="px-4 py-3 font-medium">Task</th>
                     <th className="px-4 py-3 font-medium">Project</th>
+                    <th className="px-4 py-3 font-medium">Created by</th>
+                    <th className="px-4 py-3 font-medium">Created at</th>
                     <th className="px-4 py-3 font-medium">Priority</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Deadline</th>
@@ -274,7 +354,7 @@ export function MyAssignedTasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((task, index) => {
+                  {filtered.map((task) => {
                     const priority = TASK_PRIORITIES.find((p) => p.value === task.priority)
                     const overdue = isOverdue(task.deadline, task.status)
                     const clientAssigned = isClientAssignedTask(task)
@@ -291,8 +371,8 @@ export function MyAssignedTasksPage() {
                         )}
                         onClick={() => openDetail(task)}
                       >
-                        <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                          {index + 1}
+                        <td className="px-4 py-3 text-muted-foreground tabular-nums font-medium">
+                          #{task.id}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-start gap-2">
@@ -319,6 +399,14 @@ export function MyAssignedTasksPage() {
                           >
                             {task.project?.project_name ?? `Project #${task.project_id}`}
                           </Link>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          <span className="line-clamp-1" title={formatTaskCreator(task)}>
+                            {formatTaskCreator(task)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
+                          {formatTaskCreatedAt(task)}
                         </td>
                         <td className="px-4 py-3">
                           {priority && (
@@ -419,6 +507,60 @@ export function MyAssignedTasksPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={pickProjectOpen} onOpenChange={setPickProjectOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add new task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">
+              Choose the project this task belongs to.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Project</Label>
+              <Select
+                value={newTaskProjectId}
+                onValueChange={setNewTaskProjectId}
+                disabled={loadingProjects || creatableProjects.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      loadingProjects ? 'Loading projects…' : 'Select a project'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {creatableProjects.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.project_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!loadingProjects && creatableProjects.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {role === 'client'
+                    ? 'No projects allow you to add tasks right now.'
+                    : 'You are not assigned to any active projects yet.'}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPickProjectOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmCreateProject}
+              disabled={!newTaskProjectId || loadingProjects}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {activeProjectId != null && (
         <>

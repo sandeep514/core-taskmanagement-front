@@ -110,7 +110,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
     const taskId = toTaskId(event.active.id)
     const task = itemsRef.current.find((t) => t.id === taskId) ?? null
     if (!canMoveTask(task)) {
-      toast.error('Only an assigned user can change the status of this task.')
+      toast.error('You cannot change the status of this task.')
       return
     }
     isDraggingRef.current = true

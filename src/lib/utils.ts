@@ -28,6 +28,28 @@ export function formatDate(date: string | Date | null | undefined, fallback = '�
   })
 }
 
+/** Date + time for timestamps (created_at, activity, etc.). */
+export function formatDateTime(date: string | Date | null | undefined, fallback = '—') {
+  const d = parseDate(date)
+  if (!d) return fallback
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+/** Prefer API created_at timestamp; fall back to task_created_on date. */
+export function formatTaskCreatedAt(task: {
+  created_at?: string | null
+  task_created_on?: string | null
+}): string {
+  if (task.created_at) return formatDateTime(task.created_at)
+  return formatDate(task.task_created_on)
+}
+
 /** Display label for task assignees (employees and/or client). */
 export function formatTaskAssignees(task: {
   assignees?: { id: number; name: string }[] | null
@@ -45,6 +67,20 @@ export function formatTaskAssignees(task: {
   if (list.length === 1) return list[0].name
   if (list.length === 2) return `${list[0].name} + ${list[1].name}`
   return `${list[0].name} +${list.length - 1}`
+}
+
+/** Display label for who created the task. */
+export function formatTaskCreator(task: {
+  created_by_name?: string | null
+  created_by_type?: string | null
+  creator?: { name?: string | null } | null
+}): string {
+  if (task.created_by_name?.trim()) return task.created_by_name.trim()
+  if (task.creator?.name?.trim()) return task.creator.name.trim()
+  if (task.created_by_type === 'admin') return 'Admin'
+  if (task.created_by_type === 'client') return 'Client'
+  if (task.created_by_type === 'employee') return 'Employee'
+  return '—'
 }
 
 export function taskAssigneeIds(task: {
@@ -72,17 +108,11 @@ export function isTaskAssignedToUser(
   return taskAssigneeIds(task).includes(userId)
 }
 
-const CLIENT_REVIEW_STATUSES = ['client_review', 'done'] as const
-
 /**
- * Who may change task status:
- * - Admin: always
- * - Employee: only if they are an assignee
- * - Client: if assigned (any status), OR when status is client_review / done
- *   (then only between those two)
+ * Anyone with project access may move task status (API enforces membership).
  */
 export function canChangeTaskStatus(
-  task: {
+  _task: {
     assigned_to_ids?: number[] | null
     assignees?: { id: number }[] | null
     assigned_to?: number | null
@@ -90,33 +120,15 @@ export function canChangeTaskStatus(
     status?: string | null
   },
   user: { id: number; role?: string } | null | undefined,
-  newStatus?: string | null,
+  _newStatus?: string | null,
 ): boolean {
   if (!user) return false
-  if (user.role === 'admin') return true
-  if (user.role === 'employee') {
-    return isTaskAssignedToUser(task, user.id, user.role)
-  }
-  if (user.role === 'client') {
-    if (isTaskAssignedToUser(task, user.id, 'client')) return true
-    const current = task.status ?? ''
-    if (!CLIENT_REVIEW_STATUSES.includes(current as (typeof CLIENT_REVIEW_STATUSES)[number])) {
-      return false
-    }
-    if (
-      newStatus != null &&
-      !CLIENT_REVIEW_STATUSES.includes(newStatus as (typeof CLIENT_REVIEW_STATUSES)[number])
-    ) {
-      return false
-    }
-    return true
-  }
-  return false
+  return user.role === 'admin' || user.role === 'employee' || user.role === 'client'
 }
 
-/** Status options a user may pick for this task (null = all statuses). */
+/** Status options a user may pick (null = all statuses). */
 export function allowedTaskStatusesForUser(
-  task: {
+  _task: {
     assigned_to_ids?: number[] | null
     assignees?: { id: number }[] | null
     assigned_to?: number | null
@@ -126,22 +138,25 @@ export function allowedTaskStatusesForUser(
   user: { id: number; role?: string } | null | undefined,
 ): string[] | null {
   if (!user) return []
-  if (user.role === 'admin') return null
-  if (user.role === 'employee') {
-    return isTaskAssignedToUser(task, user.id, 'employee') ? null : []
-  }
-  if (user.role === 'client') {
-    if (isTaskAssignedToUser(task, user.id, 'client')) return null
-    if (
-      CLIENT_REVIEW_STATUSES.includes(
-        (task.status ?? '') as (typeof CLIENT_REVIEW_STATUSES)[number],
-      )
-    ) {
-      return [...CLIENT_REVIEW_STATUSES]
-    }
-    return []
+  if (user.role === 'admin' || user.role === 'employee' || user.role === 'client') {
+    return null
   }
   return []
+}
+
+/** Full field edits (title, assignees, etc.) — only the task creator. */
+export function canEditTask(
+  task: {
+    created_by?: number | null
+    created_by_type?: string | null
+  } | null | undefined,
+  user: { id: number; role?: string } | null | undefined,
+): boolean {
+  if (!user || !task) return false
+  if (task.created_by == null || !task.created_by_type) return false
+  return (
+    task.created_by_type === user.role && Number(task.created_by) === Number(user.id)
+  )
 }
 
 /** True when the task is assigned to the project client (not an employee). */

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { changePassword } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
@@ -15,6 +15,56 @@ interface ChangePasswordFormProps {
   forced?: boolean
   onSuccess?: () => void
   submitLabel?: string
+}
+
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  placeholder,
+  required,
+  minLength,
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  autoComplete?: string
+  placeholder?: string
+  required?: boolean
+  minLength?: number
+}) {
+  const [show, setShow] = useState(false)
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={show ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          minLength={minLength}
+          className="pr-10"
+          required={required}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={show ? 'Hide password' : 'Show password'}
+          tabIndex={-1}
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export function ChangePasswordForm({
@@ -67,49 +117,40 @@ export function ChangePasswordForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {!forced && (
-        <div className="space-y-2">
-          <Label htmlFor="current_password">Current password</Label>
-          <Input
-            id="current_password"
-            type="password"
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            required
-          />
-        </div>
+        <PasswordField
+          id="current_password"
+          label="Current password"
+          value={currentPassword}
+          onChange={setCurrentPassword}
+          autoComplete="current-password"
+          required
+        />
       )}
 
       {forced && (
         <input type="hidden" name="current_password" value={currentPassword} />
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="new_password">New password</Label>
-        <Input
-          id="new_password"
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="At least 6 characters"
-          minLength={6}
-          required
-        />
-      </div>
+      <PasswordField
+        id="new_password"
+        label="New password"
+        value={password}
+        onChange={setPassword}
+        autoComplete="new-password"
+        placeholder="At least 6 characters"
+        minLength={6}
+        required
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="password_confirmation">Confirm new password</Label>
-        <Input
-          id="password_confirmation"
-          type="password"
-          autoComplete="new-password"
-          value={passwordConfirmation}
-          onChange={(e) => setPasswordConfirmation(e.target.value)}
-          minLength={6}
-          required
-        />
-      </div>
+      <PasswordField
+        id="password_confirmation"
+        label="Confirm new password"
+        value={passwordConfirmation}
+        onChange={setPasswordConfirmation}
+        autoComplete="new-password"
+        minLength={6}
+        required
+      />
 
       <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}

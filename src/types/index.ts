@@ -111,6 +111,21 @@ export interface TaskComment {
   updated_at: string
 }
 
+export interface TaskActivityLog {
+  id: number
+  task_id: number
+  user_id: number | null
+  user_type: 'admin' | 'employee' | 'client' | null
+  action: string
+  from_value: string | null
+  to_value: string | null
+  message: string | null
+  user_name?: string | null
+  meta?: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Task {
   id: number
   project_id: number
@@ -126,6 +141,10 @@ export interface Task {
   assigned_to_ids?: number[]
   assigned_to_client?: number | null
   created_by: number | null
+  /** Who created the task: admin | employee | client */
+  created_by_type?: 'admin' | 'employee' | 'client' | null
+  /** Resolved display name from API (e.g. "Admin · Jane", "Client · Acme") */
+  created_by_name?: string | null
   priority: TaskPriority
   task_type: TaskType
   status: TaskStatus
@@ -138,6 +157,7 @@ export interface Task {
   project?: Pick<Project, 'id' | 'project_name' | 'client_id'> | null
   attachments?: TaskAttachment[]
   comments?: TaskComment[]
+  activity_logs?: TaskActivityLog[]
   attachments_count?: number
   comments_count?: number
   created_at: string

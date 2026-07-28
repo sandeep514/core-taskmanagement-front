@@ -17,6 +17,7 @@ import {
   type TaskTypeFilter,
 } from '@/components/tasks/TaskBoardFilters'
 import { formatDate } from '@/lib/utils'
+import { useProjectTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 export function ClientProjectBoardPage() {
   const { projectId } = useParams()
@@ -34,6 +35,9 @@ export function ClientProjectBoardPage() {
 
   const canSee = project?.can_client_see_tasks ?? false
   const canAdd = project?.can_client_add_tasks ?? false
+
+  // Only subscribe when the client is allowed to view the board
+  useProjectTasksRealtime(canSee ? id : null)
 
   const { data: tasks, isLoading: loadingTasks } = useQuery({
     queryKey: ['project-tasks', id],

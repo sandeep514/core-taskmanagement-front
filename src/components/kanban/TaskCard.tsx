@@ -1,10 +1,19 @@
 import { forwardRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Briefcase, Calendar, Clock, MessageSquare, Paperclip } from 'lucide-react'
+import { Briefcase, Calendar, Clock, MessageSquare, Paperclip, UserRound } from 'lucide-react'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_TYPES } from '@/types'
-import { cn, formatDate, formatTaskAssignees, initials, isClientAssignedTask, isOverdue } from '@/lib/utils'
+import {
+  cn,
+  formatDate,
+  formatTaskAssignees,
+  formatTaskCreatedAt,
+  formatTaskCreator,
+  initials,
+  isClientAssignedTask,
+  isOverdue,
+} from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 interface TaskCardContentProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -45,7 +54,14 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
         )}
         {...props}
       >
-        <p className="text-sm font-medium leading-snug line-clamp-2">{task.title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium leading-snug line-clamp-2 flex-1 min-w-0">
+            {task.title}
+          </p>
+          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
+            #{task.id}
+          </span>
+        </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {clientAssigned && (
@@ -93,7 +109,7 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             {(task.assignees && task.assignees.length > 0) ||
             task.assignee ||
@@ -126,7 +142,7 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
               <span className="text-xs text-muted-foreground">Unassigned</span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-muted-foreground shrink-0">
             {(task.attachments_count ?? 0) > 0 && (
               <span className="inline-flex items-center gap-0.5 text-[11px]">
                 <Paperclip className="h-3 w-3" />
@@ -140,6 +156,24 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
               </span>
             )}
           </div>
+        </div>
+
+        <div className="mt-2 flex flex-col gap-0.5 min-w-0 text-[11px] text-muted-foreground">
+          {formatTaskCreator(task) !== '—' ? (
+            <div className="flex items-center gap-1 min-w-0">
+              <UserRound className="h-3 w-3 shrink-0 opacity-70" />
+              <span className="truncate" title={formatTaskCreator(task)}>
+                By {formatTaskCreator(task)}
+              </span>
+            </div>
+          ) : null}
+          {task.created_at || task.task_created_on ? (
+            <div className="flex items-center gap-1 min-w-0 pl-0.5">
+              <span className="truncate" title={formatTaskCreatedAt(task)}>
+                Created {formatTaskCreatedAt(task)}
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     )

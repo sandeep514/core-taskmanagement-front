@@ -7,6 +7,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  History,
   Loader2,
   MessageSquare,
   Paperclip,
@@ -25,8 +26,19 @@ import {
 } from '@/lib/api'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
-import { cn, formatDate, formatTaskAssignees, initials, isClientAssignedTask, isOverdue } from '@/lib/utils'
+import {
+  canEditTask,
+  cn,
+  formatDate,
+  formatTaskAssignees,
+  formatTaskCreatedAt,
+  formatTaskCreator,
+  initials,
+  isClientAssignedTask,
+  isOverdue,
+} from '@/lib/utils'
 import { getApiError } from '@/lib/api-error'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
@@ -57,6 +69,7 @@ export function TaskDetailModal({
   onEdit,
 }: TaskDetailModalProps) {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
   const fileRef = useRef<HTMLInputElement>(null)
   const [comment, setComment] = useState('')
   const [copyOpen, setCopyOpen] = useState(false)
@@ -66,6 +79,9 @@ export function TaskDetailModal({
     queryFn: () => fetchTask(taskId!),
     enabled: open && !!taskId,
   })
+
+  const mayEdit = canEditTask(task, user)
+  const creatorLabel = task ? formatTaskCreator(task) : '—'
 
   const commentMutation = useMutation({
     mutationFn: () => addTaskComment(taskId!, comment),
@@ -125,6 +141,9 @@ export function TaskDetailModal({
             >
               <div className="flex items-start justify-between gap-4 pr-6">
                 <div className="min-w-0">
+                  <p className="text-xs font-semibold tabular-nums text-muted-foreground mb-1">
+                    Task #{task.id}
+                  </p>
                   <DialogTitle className="text-xl leading-snug">{task.title}</DialogTitle>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {clientAssigned && (
@@ -176,31 +195,39 @@ export function TaskDetailModal({
                     <Copy className="h-3.5 w-3.5" />
                     Copy
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      onEdit(task)
-                    }}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-amber-700 hover:text-amber-800"
-                    onClick={() => {
-                      if (confirm('Deactivate this task? It will be hidden from the board.')) {
-                        deactivateMutation.mutate()
-                      }
-                    }}
-                  >
-                    <Power className="h-3.5 w-3.5" />
-                    Deactivate
-                  </Button>
+                  {mayEdit ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        onEdit(task)
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  ) : null}
+                  {mayEdit ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-amber-700 hover:text-amber-800"
+                      onClick={() => {
+                        if (confirm('Deactivate this task? It will be hidden from the board.')) {
+                          deactivateMutation.mutate()
+                        }
+                      }}
+                    >
+                      <Power className="h-3.5 w-3.5" />
+                      Deactivate
+                    </Button>
+                  ) : null}
                 </div>
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{creatorLabel}</span> can edit
+                this task. Anyone on the project can move status.
+              </p>
             </DialogHeader>
 
             <div className="px-6 pb-6 space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin">
@@ -260,8 +287,23 @@ export function TaskDetailModal({
                   )}
                 </div>
                 <div className="rounded-lg border border-border p-3">
-                  <p className="text-xs text-muted-foreground mb-1.5">Created</p>
-                  <p className="text-sm font-medium">{formatDate(task.task_created_on)}</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">Created by</p>
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="text-[10px] bg-slate-100 text-slate-700">
+                        {initials(formatTaskCreator(task))}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{formatTaskCreator(task)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Created at {formatTaskCreatedAt(task)}
+                      </p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        Task ID #{task.id}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -347,6 +389,43 @@ export function TaskDetailModal({
                         </li>
                       )
                     })}
+                  </ul>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Activity log */}
+              <div>
+                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                  <History className="h-4 w-4" />
+                  Activity
+                  <Badge variant="secondary">{task.activity_logs?.length ?? 0}</Badge>
+                </h4>
+                {(task.activity_logs?.length ?? 0) === 0 ? (
+                  <p className="text-sm text-muted-foreground">No activity yet</p>
+                ) : (
+                  <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {task.activity_logs?.map((log) => (
+                      <li
+                        key={log.id}
+                        className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm"
+                      >
+                        <p className="text-foreground/90">
+                          {log.message ||
+                            `${log.user_name || 'Someone'} · ${log.action}`}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {formatDate(log.created_at)}
+                          {log.created_at?.includes('T')
+                            ? ` · ${new Date(log.created_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}`
+                            : null}
+                        </p>
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>

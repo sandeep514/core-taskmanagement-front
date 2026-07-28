@@ -17,10 +17,13 @@ import {
   type TaskTypeFilter,
 } from '@/components/tasks/TaskBoardFilters'
 import { formatDate } from '@/lib/utils'
+import { useProjectTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 export function AdminProjectBoardPage() {
   const { projectId } = useParams()
   const id = Number(projectId)
+
+  useProjectTasksRealtime(id)
 
   const {
     data: project,

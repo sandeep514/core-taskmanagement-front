@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AuthUser, UserRole } from '@/types'
 import * as api from '@/lib/api'
+import { disconnectEcho } from '@/lib/echo'
 
 interface AuthState {
   token: string | null
@@ -83,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // ignore network errors on logout
         }
+        disconnectEcho()
         persistToken(null, null)
         set({ token: null, user: null, isAuthenticated: false })
       },
