@@ -34,6 +34,7 @@ export function ProjectBoardPage() {
   const [taskFilter, setTaskFilter] = useState<TaskScopeFilter>('all')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
+  const [search, setSearch] = useState('')
 
   // Live updates for all viewers on this board
   useProjectTasksRealtime(id)
@@ -63,8 +64,8 @@ export function ProjectBoardPage() {
     if (taskFilter === 'mine' && user?.id) {
       list = list.filter((t) => isTaskAssignedToUser(t, user.id, 'employee'))
     }
-    return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter)
-  }, [tasks, taskFilter, user?.id, priorityFilter, taskTypeFilter])
+    return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter, search)
+  }, [tasks, taskFilter, user?.id, priorityFilter, taskTypeFilter, search])
 
   if (loadingProjects || loadingTasks) return <PageLoader />
 
@@ -115,7 +116,10 @@ export function ProjectBoardPage() {
             <span>·</span>
             <span>Deadline {formatDate(project.deadline)}</span>
             <Badge variant="secondary">
-              {taskFilter === 'mine'
+              {taskFilter === 'mine' ||
+              priorityFilter !== 'all' ||
+              taskTypeFilter !== 'all' ||
+              search.trim()
                 ? `${visibleCount} of ${totalCount} tasks`
                 : `${totalCount} tasks`}
             </Badge>
@@ -144,6 +148,8 @@ export function ProjectBoardPage() {
             taskType={taskTypeFilter}
             onPriorityChange={setPriorityFilter}
             onTaskTypeChange={setTaskTypeFilter}
+            search={search}
+            onSearchChange={setSearch}
           />
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />

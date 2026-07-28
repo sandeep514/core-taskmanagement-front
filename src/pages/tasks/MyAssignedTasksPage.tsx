@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, ClipboardList, ExternalLink, Plus } from 'lucide-react'
+import { CalendarClock, ClipboardList, ExternalLink, Plus, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
@@ -23,8 +23,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { matchesTaskSearch } from '@/components/tasks/TaskBoardFilters'
 import {
   Dialog,
   DialogContent,
@@ -53,6 +55,7 @@ export function MyAssignedTasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [search, setSearch] = useState('')
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -126,9 +129,10 @@ export function MyAssignedTasksPage() {
       if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false
       if (taskTypeFilter !== 'all' && (task.task_type ?? 'general') !== taskTypeFilter) return false
       if (statusFilter !== 'all' && task.status !== statusFilter) return false
+      if (!matchesTaskSearch(task, search)) return false
       return true
     })
-  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter])
+  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter, search])
 
   const stats = useMemo(() => {
     const list = data ?? []
@@ -144,13 +148,15 @@ export function MyAssignedTasksPage() {
     projectFilter !== 'all' ||
     priorityFilter !== 'all' ||
     taskTypeFilter !== 'all' ||
-    statusFilter !== 'all'
+    statusFilter !== 'all' ||
+    Boolean(search.trim())
 
   const clearFilters = () => {
     setProjectFilter('all')
     setPriorityFilter('all')
     setTaskTypeFilter('all')
     setStatusFilter('all')
+    setSearch('')
   }
 
   const statusMutation = useMutation({
@@ -220,6 +226,26 @@ export function MyAssignedTasksPage() {
       />
 
       <div className="mb-5 space-y-3">
+        <div className="relative max-w-md">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by task #, title, or description…"
+            className="h-9 pl-9 pr-8"
+          />
+          {search.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5 min-w-[180px]">
             <Label className="text-xs text-muted-foreground">Project</Label>

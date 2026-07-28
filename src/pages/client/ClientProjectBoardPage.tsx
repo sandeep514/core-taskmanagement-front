@@ -51,10 +51,11 @@ export function ClientProjectBoardPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
+  const [search, setSearch] = useState('')
 
   const filteredTasks = useMemo(
-    () => filterTasksByPriorityAndType(tasks ?? [], priorityFilter, taskTypeFilter),
-    [tasks, priorityFilter, taskTypeFilter],
+    () => filterTasksByPriorityAndType(tasks ?? [], priorityFilter, taskTypeFilter, search),
+    [tasks, priorityFilter, taskTypeFilter, search],
   )
 
   if (loadingProject) return <PageLoader />
@@ -118,7 +119,7 @@ export function ClientProjectBoardPage() {
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>Deadline {formatDate(project.deadline)}</span>
             <Badge variant="secondary">
-              {priorityFilter !== 'all' || taskTypeFilter !== 'all'
+              {priorityFilter !== 'all' || taskTypeFilter !== 'all' || search.trim()
                 ? `${filteredTasks.length} of ${tasks?.length ?? 0} tasks`
                 : `${tasks?.length ?? 0} tasks`}
             </Badge>
@@ -136,6 +137,8 @@ export function ClientProjectBoardPage() {
             taskType={taskTypeFilter}
             onPriorityChange={setPriorityFilter}
             onTaskTypeChange={setTaskTypeFilter}
+            search={search}
+            onSearchChange={setSearch}
           />
           {canAdd && (
             <Button onClick={openCreate} className="bg-violet-600 hover:bg-violet-700">

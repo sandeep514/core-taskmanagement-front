@@ -47,10 +47,11 @@ export function AdminProjectBoardPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
+  const [search, setSearch] = useState('')
 
   const filteredTasks = useMemo(
-    () => filterTasksByPriorityAndType(tasks ?? [], priorityFilter, taskTypeFilter),
-    [tasks, priorityFilter, taskTypeFilter],
+    () => filterTasksByPriorityAndType(tasks ?? [], priorityFilter, taskTypeFilter, search),
+    [tasks, priorityFilter, taskTypeFilter, search],
   )
 
   if (loadingProject || loadingTasks) return <PageLoader />
@@ -99,7 +100,7 @@ export function AdminProjectBoardPage() {
             <span>·</span>
             <span>Deadline {formatDate(project.deadline)}</span>
             <Badge variant="secondary">
-              {priorityFilter !== 'all' || taskTypeFilter !== 'all'
+              {priorityFilter !== 'all' || taskTypeFilter !== 'all' || search.trim()
                 ? `${filteredTasks.length} of ${tasks?.length ?? 0} tasks`
                 : `${tasks?.length ?? 0} tasks`}
             </Badge>
@@ -119,6 +120,8 @@ export function AdminProjectBoardPage() {
             taskType={taskTypeFilter}
             onPriorityChange={setPriorityFilter}
             onTaskTypeChange={setTaskTypeFilter}
+            search={search}
+            onSearchChange={setSearch}
           />
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
