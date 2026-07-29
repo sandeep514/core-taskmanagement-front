@@ -22,6 +22,7 @@ import { ClientProjectBoardPage } from '@/pages/client/ClientProjectBoardPage'
 import { MyAssignedTasksPage } from '@/pages/tasks/MyAssignedTasksPage'
 import { PersonalTodosPage } from '@/pages/todos/PersonalTodosPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,6 +83,7 @@ export default function App() {
         </RealtimeProvider>
       </HydrationGate>
       <Toaster position="top-right" richColors closeButton />
+      <InstallPrompt />
     </QueryClientProvider>
   )
 }
