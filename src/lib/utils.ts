@@ -144,6 +144,18 @@ export function allowedTaskStatusesForUser(
   return []
 }
 
+/** True when the auth user is a project manager (flag or designation name). */
+export function isProjectManagerUser(user: {
+  role?: string
+  is_project_manager?: boolean
+  designation?: string | null
+} | null | undefined): boolean {
+  if (!user || user.role !== 'employee') return false
+  if (user.is_project_manager) return true
+  const name = user.designation?.trim().toLowerCase()
+  return name === 'project manager'
+}
+
 /**
  * Full field edits (title, assignees, etc.).
  * Creator always; project managers may edit all tasks on projects they access.
@@ -157,11 +169,12 @@ export function canEditTask(
     id: number
     role?: string
     is_project_manager?: boolean
+    designation?: string | null
   } | null | undefined,
 ): boolean {
   if (!user || !task) return false
   // PMs can edit any task on assigned projects (API also enforces project membership).
-  if (user.role === 'employee' && user.is_project_manager) return true
+  if (isProjectManagerUser(user)) return true
   if (task.created_by == null || !task.created_by_type) return false
   return (
     task.created_by_type === user.role && Number(task.created_by) === Number(user.id)

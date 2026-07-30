@@ -225,8 +225,21 @@ export function TaskDetailModal({
                 </div>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{creatorLabel}</span> can edit
-                this task. Anyone on the project can move status.
+                {mayEdit ? (
+                  <>You can edit this task. Anyone on the project can move status.</>
+                ) : (
+                  <>
+                    Only the task creator or a project manager can edit fields. Anyone on
+                    the project can move status.
+                    {creatorLabel !== '—' ? (
+                      <>
+                        {' '}
+                        Created by{' '}
+                        <span className="font-medium text-foreground">{creatorLabel}</span>.
+                      </>
+                    ) : null}
+                  </>
+                )}
               </p>
             </DialogHeader>
 

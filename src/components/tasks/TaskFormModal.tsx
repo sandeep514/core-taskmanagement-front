@@ -209,13 +209,12 @@ export function TaskFormModal({
         </DialogHeader>
         {task && fieldsLocked ? (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-            Only <span className="font-semibold">{formatTaskCreator(task)}</span> can edit
-            this task. You can still change status from the board or detail view.
+            Only the task creator or a project manager on this project can edit fields.
+            You can still change status from the board or detail view.
           </p>
         ) : task ? (
           <p className="text-xs text-muted-foreground">
-            You created this task, so you can edit its fields. Anyone on the project can
-            move status.
+            You can edit this task&apos;s fields. Anyone on the project can move status.
           </p>
         ) : null}
         <div className="space-y-4 py-2">
