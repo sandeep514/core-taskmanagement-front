@@ -22,6 +22,10 @@ export interface AuthUser {
   role: UserRole
   /** True when password is still the admin-set default (123456). */
   must_change_password?: boolean
+  /** Employee designation name (when role is employee). */
+  designation?: string | null
+  /** True when employee designation is Project Manager. */
+  is_project_manager?: boolean
 }
 
 export interface Designation {

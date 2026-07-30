@@ -143,7 +143,9 @@ export function TaskFormModal({
     mutationFn: async () => {
       if (task) {
         if (!canEditTask(task, user)) {
-          throw new Error('Only the person who created this task can edit it.')
+          throw new Error(
+            'Only the task creator or a project manager on this project can edit it.',
+          )
         }
         return updateTask(task.id, form)
       }
