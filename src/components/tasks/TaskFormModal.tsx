@@ -9,7 +9,6 @@ import {
   canChangeTaskStatus,
   canEditTask,
   cn,
-  formatTaskCreator,
   taskAssigneeIds,
 } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
