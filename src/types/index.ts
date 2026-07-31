@@ -137,6 +137,10 @@ export interface Task {
   details: string | null
   task_created_on: string
   deadline: string | null
+  /** Estimated work start date (optional). */
+  estimate_start_date: string | null
+  /** Estimated work end date (optional; often auto from hours). */
+  estimate_end_date: string | null
   /** Estimated effort in hours (optional). */
   estimate_hours: number | null
   actual_complete_on: string | null
@@ -224,6 +228,10 @@ export interface TaskFormData {
   title: string
   details: string
   deadline: string
+  /** Estimated start date (YYYY-MM-DD) or empty. */
+  estimate_start_date: string
+  /** Estimated end date (YYYY-MM-DD) or empty; auto-filled from hours when possible. */
+  estimate_end_date: string
   /** Empty string when unset in the form; API receives number | null. */
   estimate_hours: number | ''
   assigned_to_ids: number[]

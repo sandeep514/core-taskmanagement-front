@@ -144,6 +144,48 @@ export function allowedTaskStatusesForUser(
   return []
 }
 
+/** True when the auth user is the original creator of the task. */
+export function isTaskCreator(
+  task: {
+    created_by?: number | null
+    created_by_type?: string | null
+  } | null | undefined,
+  user: { id: number; role?: string } | null | undefined,
+): boolean {
+  if (!user || !task) return false
+  if (task.created_by == null || !task.created_by_type) return false
+  return (
+    task.created_by_type === user.role && Number(task.created_by) === Number(user.id)
+  )
+}
+
+/**
+ * Estimate end date from start + hours using 8-hour workdays.
+ * 8h → same day, 16h → next day, etc.
+ */
+export function computeEstimateEndDate(
+  startDate: string,
+  hours: number,
+): string | null {
+  const d = parseDate(startDate)
+  if (!d || !Number.isFinite(hours) || hours <= 0) return null
+  const workDays = Math.max(1, Math.ceil(hours / 8))
+  d.setDate(d.getDate() + workDays - 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Local calendar date as YYYY-MM-DD. */
+export function todayDateString(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** True when the auth user is a project manager (flag or designation name). */
 export function isProjectManagerUser(user: {
   role?: string

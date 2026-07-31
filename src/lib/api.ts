@@ -95,6 +95,8 @@ function normalizeTaskPayload(payload: Partial<TaskFormData>) {
     title: payload.title,
     details: emptyToNull(payload.details ?? '') as string | null,
     deadline: emptyToNull(payload.deadline ?? '') as string | null,
+    estimate_start_date: emptyToNull(payload.estimate_start_date ?? '') as string | null,
+    estimate_end_date: emptyToNull(payload.estimate_end_date ?? '') as string | null,
     estimate_hours:
       estimate === null || Number.isNaN(estimate) ? null : estimate,
     assigned_to_ids: Array.isArray(payload.assigned_to_ids)
@@ -525,6 +527,17 @@ export async function addTaskAttachment(taskId: number, file: File): Promise<voi
   const form = new FormData()
   form.append('file', file)
   await api.post(`/${portalBase()}/tasks/${taskId}/attachments`, form)
+}
+
+/** Delete attachment — only allowed for the task creator (enforced by API). */
+export async function deleteTaskAttachment(
+  taskId: number,
+  attachmentId: number,
+): Promise<Task | null> {
+  const { data } = await api.delete<{ message?: string; task?: Task }>(
+    `/${portalBase()}/tasks/${taskId}/attachments/${attachmentId}`,
+  )
+  return data?.task ?? null
 }
 
 /** Copy a task into the same project or another accessible project. */

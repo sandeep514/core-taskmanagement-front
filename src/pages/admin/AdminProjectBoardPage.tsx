@@ -16,6 +16,7 @@ import {
   type PriorityFilter,
   type TaskTypeFilter,
 } from '@/components/tasks/TaskBoardFilters'
+import { ExportTasksButton } from '@/components/tasks/ExportTasksDialog'
 import { formatDate } from '@/lib/utils'
 import { useProjectTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
@@ -122,6 +123,11 @@ export function AdminProjectBoardPage() {
             onTaskTypeChange={setTaskTypeFilter}
             search={search}
             onSearchChange={setSearch}
+          />
+          <ExportTasksButton
+            tasks={filteredTasks}
+            fileName={`${project.project_name}-tasks`}
+            contextLabel={project.project_name}
           />
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />

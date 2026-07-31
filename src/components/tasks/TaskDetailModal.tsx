@@ -14,6 +14,7 @@ import {
   Pencil,
   Send,
   Power,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,6 +23,7 @@ import {
   addTaskComment,
   attachmentUrl,
   deactivateTask,
+  deleteTaskAttachment,
   fetchTask,
 } from '@/lib/api'
 import type { Task } from '@/types'
@@ -36,6 +38,7 @@ import {
   initials,
   isClientAssignedTask,
   isOverdue,
+  isTaskCreator,
 } from '@/lib/utils'
 import { getApiError } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/authStore'
@@ -81,15 +84,20 @@ export function TaskDetailModal({
   })
 
   const mayEdit = canEditTask(task, user)
+  const mayDeleteAttachment = isTaskCreator(task, user)
   const creatorLabel = task ? formatTaskCreator(task) : '—'
+
+  const invalidateTaskQueries = () => {
+    qc.invalidateQueries({ queryKey: ['task', taskId] })
+    qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+    qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+  }
 
   const commentMutation = useMutation({
     mutationFn: () => addTaskComment(taskId!, comment),
     onSuccess: () => {
       setComment('')
-      qc.invalidateQueries({ queryKey: ['task', taskId] })
-      qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
-      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+      invalidateTaskQueries()
       toast.success('Comment added')
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to add comment')),
@@ -98,12 +106,22 @@ export function TaskDetailModal({
   const attachMutation = useMutation({
     mutationFn: (file: File) => addTaskAttachment(taskId!, file),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['task', taskId] })
-      qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
-      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+      invalidateTaskQueries()
       toast.success('Attachment uploaded')
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to upload file')),
+  })
+
+  const deleteAttachMutation = useMutation({
+    mutationFn: (attachmentId: number) => deleteTaskAttachment(taskId!, attachmentId),
+    onSuccess: (updated) => {
+      if (updated) {
+        qc.setQueryData(['task', taskId], updated)
+      }
+      invalidateTaskQueries()
+      toast.success('Attachment deleted')
+    },
+    onError: (err) => toast.error(getApiError(err, 'Failed to delete attachment')),
   })
 
   const deactivateMutation = useMutation({
@@ -166,6 +184,19 @@ export function TaskDetailModal({
                         {priority.label}
                       </span>
                     )}
+                    {(task.estimate_start_date || task.estimate_end_date) && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
+                        <Calendar className="h-3 w-3" />
+                        Est.{' '}
+                        {task.estimate_start_date
+                          ? formatDate(task.estimate_start_date)
+                          : '—'}
+                        {' – '}
+                        {task.estimate_end_date
+                          ? formatDate(task.estimate_end_date)
+                          : '—'}
+                      </span>
+                    )}
                     {task.deadline && (
                       <span
                         className={cn(
@@ -174,7 +205,7 @@ export function TaskDetailModal({
                         )}
                       >
                         <Calendar className="h-3 w-3" />
-                        {formatDate(task.deadline)}
+                        Deadline {formatDate(task.deadline)}
                         {overdue && ' · Overdue'}
                       </span>
                     )}
@@ -399,10 +430,40 @@ export function TaskDetailModal({
                             <Download className="h-3.5 w-3.5" />
                             <span className="sr-only">Download</span>
                           </a>
+                          {mayDeleteAttachment && (
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              title="Delete attachment"
+                              disabled={deleteAttachMutation.isPending}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Delete attachment "${a.file_name}"? This cannot be undone.`,
+                                  )
+                                ) {
+                                  deleteAttachMutation.mutate(a.id)
+                                }
+                              }}
+                            >
+                              {deleteAttachMutation.isPending &&
+                              deleteAttachMutation.variables === a.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                              <span className="sr-only">Delete</span>
+                            </button>
+                          )}
                         </li>
                       )
                     })}
                   </ul>
+                )}
+                {mayDeleteAttachment && (task.attachments?.length ?? 0) > 0 && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    As the task creator you can delete attachments.
+                  </p>
                 )}
               </div>
 

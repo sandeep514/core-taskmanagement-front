@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/select'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
+import { ExportTasksButton } from '@/components/tasks/ExportTasksDialog'
 import { useProjectsTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 export function MyAssignedTasksPage() {
@@ -218,10 +219,20 @@ export function MyAssignedTasksPage() {
         title="My Tasks"
         description="Tasks assigned to you across all projects, ordered by priority and deadline."
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Add new task
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Export is for staff only — never show to clients */}
+            {(role === 'employee' || role === 'admin') && (
+              <ExportTasksButton
+                tasks={filtered}
+                fileName="my-assigned-tasks"
+                contextLabel="My Tasks"
+              />
+            )}
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              Add new task
+            </Button>
+          </div>
         }
       />
 

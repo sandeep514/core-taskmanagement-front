@@ -9,7 +9,9 @@ import {
   canChangeTaskStatus,
   canEditTask,
   cn,
+  computeEstimateEndDate,
   taskAssigneeIds,
+  todayDateString,
 } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { Task, TaskFormData, TaskPriority, TaskStatus, TaskType } from '@/types'
@@ -45,6 +47,8 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   title: '',
   details: '',
   deadline: '',
+  estimate_start_date: '',
+  estimate_end_date: '',
   estimate_hours: '',
   assigned_to_ids: [],
   assigned_to_client: '',
@@ -52,6 +56,27 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   task_type: 'general',
   status,
 })
+
+/** When hours are set, ensure start (default today) and auto-fill end date. */
+function withAutoEstimateEnd(
+  form: TaskFormData,
+  patch: Partial<TaskFormData>,
+): TaskFormData {
+  const next = { ...form, ...patch }
+  const hours =
+    next.estimate_hours === '' || next.estimate_hours === undefined
+      ? null
+      : Number(next.estimate_hours)
+
+  if (hours != null && !Number.isNaN(hours) && hours > 0) {
+    const start = next.estimate_start_date || todayDateString()
+    next.estimate_start_date = start
+    const end = computeEstimateEndDate(start, hours)
+    if (end) next.estimate_end_date = end
+  }
+
+  return next
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -88,6 +113,8 @@ export function TaskFormModal({
         title: task.title,
         details: task.details || '',
         deadline: task.deadline || '',
+        estimate_start_date: task.estimate_start_date || '',
+        estimate_end_date: task.estimate_end_date || '',
         estimate_hours:
           task.estimate_hours === null || task.estimate_hours === undefined
             ? ''
@@ -275,31 +302,70 @@ export function TaskFormModal({
               </Select>
             </div>
           </div>
-          <div className="grid sm:grid-cols-3 gap-3">
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select
+              value={form.status}
+              onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}
+              disabled={statusLocked}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {statusLocked && (
+              <p className="text-xs text-muted-foreground">
+                You cannot change status on this task.
+              </p>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}
-                disabled={statusLocked}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {statusLocked && (
-                <p className="text-xs text-muted-foreground">
-                  You cannot change status on this task.
-                </p>
-              )}
+              <Label>Estimate start date</Label>
+              <Input
+                type="date"
+                value={form.estimate_start_date}
+                onChange={(e) => {
+                  const start = e.target.value
+                  const hours =
+                    form.estimate_hours === '' ? null : Number(form.estimate_hours)
+                  if (start && hours != null && !Number.isNaN(hours) && hours > 0) {
+                    setForm(
+                      withAutoEstimateEnd(form, {
+                        estimate_start_date: start,
+                      }),
+                    )
+                  } else {
+                    setForm({ ...form, estimate_start_date: start })
+                  }
+                }}
+                disabled={fieldsLocked}
+              />
             </div>
+            <div className="space-y-2">
+              <Label>Estimate end date</Label>
+              <Input
+                type="date"
+                value={form.estimate_end_date}
+                onChange={(e) => setForm({ ...form, estimate_end_date: e.target.value })}
+                disabled={fieldsLocked}
+                min={form.estimate_start_date || undefined}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Auto-filled from start + estimate hours (8h workday). You can override.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Deadline</Label>
               <Input
@@ -320,10 +386,15 @@ export function TaskFormModal({
                 value={form.estimate_hours === '' ? '' : form.estimate_hours}
                 onChange={(e) => {
                   const v = e.target.value
-                  setForm({
-                    ...form,
-                    estimate_hours: v === '' ? '' : Number(v),
-                  })
+                  if (v === '') {
+                    setForm({ ...form, estimate_hours: '' })
+                    return
+                  }
+                  setForm(
+                    withAutoEstimateEnd(form, {
+                      estimate_hours: Number(v),
+                    }),
+                  )
                 }}
                 disabled={fieldsLocked}
               />
