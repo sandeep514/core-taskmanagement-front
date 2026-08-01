@@ -1,4 +1,3 @@
-import XLSX from 'xlsx'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import {
@@ -135,6 +134,71 @@ function cellValue(task: Task, key: ExportColumnKey): string | number {
   }
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+function cellXml(value: string | number): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`
+  }
+  const text = escapeXml(String(value ?? ''))
+  return `<Cell><Data ss:Type="String">${text}</Data></Cell>`
+}
+
+/**
+ * Build Excel-compatible SpreadsheetML (opens in Excel / LibreOffice / Google Sheets).
+ * Zero runtime dependencies — avoids fragile xlsx package installs on deploy servers.
+ */
+function buildSpreadsheetMl(
+  headers: string[],
+  rows: Array<Array<string | number>>,
+  sheetName: string,
+): string {
+  const safeSheet = escapeXml(sheetName.slice(0, 31) || 'Tasks')
+  const headerRow = `<Row>${headers.map((h) => cellXml(h)).join('')}</Row>`
+  const dataRows = rows.map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`).join('')
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Header">
+   <Font ss:Bold="1"/>
+   <Interior ss:Color="#EEF2FF" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="${safeSheet}">
+  <Table>
+   ${headerRow.replace(/<Cell>/g, '<Cell ss:StyleID="Header">')}
+   ${dataRows}
+  </Table>
+ </Worksheet>
+</Workbook>`
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Delay revoke so the browser can start the download
+  setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
 export interface ExportTasksOptions {
   tasks: Task[]
   columns: ExportColumnKey[]
@@ -144,7 +208,8 @@ export interface ExportTasksOptions {
 }
 
 /**
- * Build and download an .xlsx workbook for the given tasks and selected columns.
+ * Build and download an Excel-compatible spreadsheet for the given tasks and columns.
+ * Uses SpreadsheetML (.xls) with no external packages.
  */
 export function exportTasksToExcel({
   tasks,
@@ -163,30 +228,16 @@ export function exportTasksToExcel({
     .map((key) => EXPORT_COLUMNS.find((c) => c.key === key))
     .filter((c): c is ExportColumnDef => Boolean(c))
 
-  const rows = tasks.map((task) => {
-    const row: Record<string, string | number> = {}
-    for (const col of colDefs) {
-      row[col.label] = cellValue(task, col.key)
-    }
-    return row
+  const headers = colDefs.map((c) => c.label)
+  const dataRows = tasks.map((task) => colDefs.map((col) => cellValue(task, col.key)))
+
+  const xml = buildSpreadsheetMl(headers, dataRows, sheetName)
+  // UTF-8 BOM helps Excel on Windows detect encoding correctly
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + xml], {
+    type: 'application/vnd.ms-excel;charset=utf-8',
   })
-
-  const worksheet = XLSX.utils.json_to_sheet(rows)
-
-  // Approximate column widths from header + sample content
-  const colWidths = colDefs.map((col) => {
-    let max = col.label.length
-    for (const row of rows.slice(0, 50)) {
-      const val = String(row[col.label] ?? '')
-      if (val.length > max) max = Math.min(val.length, 60)
-    }
-    return { wch: Math.max(10, Math.min(max + 2, 50)) }
-  })
-  worksheet['!cols'] = colWidths
-
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31))
 
   const safeName = fileName.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'tasks-export'
-  XLSX.writeFile(workbook, `${safeName}.xlsx`)
+  downloadBlob(blob, `${safeName}.xls`)
 }
