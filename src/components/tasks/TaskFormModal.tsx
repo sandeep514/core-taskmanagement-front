@@ -229,22 +229,28 @@ export function TaskFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="w-[min(100vw-1.5rem,56rem)] max-w-4xl gap-3 p-5 sm:p-6 max-h-[min(92vh,900px)] overflow-y-auto">
+        <DialogHeader className="space-y-1 pr-8">
           <DialogTitle>{task ? 'Edit Task' : 'Create Task'}</DialogTitle>
+          {task && fieldsLocked ? (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 text-left">
+              Only the task creator or a project manager on this project can edit fields.
+              You can still change status from the board or detail view.
+            </p>
+          ) : task ? (
+            <p className="text-xs text-muted-foreground text-left">
+              You can edit this task&apos;s fields. Anyone on the project can move status.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground text-left">
+              Fill in the details below. Multiple employee assignees create one task each.
+            </p>
+          )}
         </DialogHeader>
-        {task && fieldsLocked ? (
-          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-            Only the task creator or a project manager on this project can edit fields.
-            You can still change status from the board or detail view.
-          </p>
-        ) : task ? (
-          <p className="text-xs text-muted-foreground">
-            You can edit this task&apos;s fields. Anyone on the project can move status.
-          </p>
-        ) : null}
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
+
+        <div className="space-y-3">
+          {/* Title full width */}
+          <div className="space-y-1.5">
             <Label>Title</Label>
             <Input
               value={form.title}
@@ -253,17 +259,93 @@ export function TaskFormModal({
               disabled={fieldsLocked}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Details</Label>
-            <Textarea
-              value={form.details}
-              onChange={(e) => setForm({ ...form, details: e.target.value })}
-              placeholder="Description, acceptance criteria…"
-              disabled={fieldsLocked}
-            />
+
+          {/* Details + Assignees side by side on wide screens */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1.5 min-w-0">
+              <Label>Details</Label>
+              <Textarea
+                value={form.details}
+                onChange={(e) => setForm({ ...form, details: e.target.value })}
+                placeholder="Description, acceptance criteria…"
+                disabled={fieldsLocked}
+                className="min-h-[120px] md:min-h-[148px] resize-y"
+              />
+            </div>
+
+            <div
+              className={cn(
+                'space-y-1.5 min-w-0',
+                fieldsLocked && 'opacity-60 pointer-events-none',
+              )}
+            >
+              <Label>Assignees</Label>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Employees and client are exclusive. Multiple employees → one task each.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={clearAssignees}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-1 text-xs transition-colors',
+                    isUnassigned
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:bg-secondary',
+                  )}
+                >
+                  Unassigned
+                </button>
+                {project?.client && (
+                  <button
+                    type="button"
+                    onClick={() => assignClient(project.client!.id)}
+                    className={cn(
+                      'rounded-lg border px-2.5 py-1 text-xs transition-colors',
+                      form.assigned_to_client === project.client.id
+                        ? 'border-violet-500 bg-violet-50 text-violet-800 font-medium'
+                        : 'border-border text-muted-foreground hover:bg-secondary',
+                    )}
+                  >
+                    Client · {project.client.name}
+                  </button>
+                )}
+              </div>
+              {activeEmployees.length > 0 && (
+                <div className="max-h-[112px] overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                  {activeEmployees.map((e) => {
+                    const checked = form.assigned_to_ids.includes(e.id)
+                    return (
+                      <label
+                        key={e.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2.5 px-2.5 py-1.5 text-sm hover:bg-muted/40',
+                          checked && 'bg-primary/5',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-border"
+                          checked={checked}
+                          onChange={() => toggleEmployee(e.id)}
+                        />
+                        <span className="font-medium truncate">{e.name}</span>
+                        {e.designation?.designation && (
+                          <span className="ml-auto text-[11px] text-muted-foreground shrink-0">
+                            {e.designation.designation}
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
+
+          {/* Type / Priority / Status */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
               <Label>Task Type</Label>
               <Select
                 value={form.task_type}
@@ -282,7 +364,7 @@ export function TaskFormModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Priority</Label>
               <Select
                 value={form.priority}
@@ -301,34 +383,35 @@ export function TaskFormModal({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}
-              disabled={statusLocked}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {statusLocked && (
-              <p className="text-xs text-muted-foreground">
-                You cannot change status on this task.
-              </p>
-            )}
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) => setForm({ ...form, status: v as TaskStatus })}
+                disabled={statusLocked}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {statusLocked && (
+                <p className="text-[11px] text-muted-foreground">
+                  You cannot change status on this task.
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
+          {/* Estimate start / end / hours / deadline — one row on large screens */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1.5">
               <Label>Estimate start date</Label>
               <Input
                 type="date"
@@ -350,7 +433,7 @@ export function TaskFormModal({
                 disabled={fieldsLocked}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Estimate end date</Label>
               <Input
                 type="date"
@@ -359,23 +442,11 @@ export function TaskFormModal({
                 disabled={fieldsLocked}
                 min={form.estimate_start_date || undefined}
               />
-              <p className="text-[11px] text-muted-foreground">
-                Auto-filled from start + estimate hours (8h workday). You can override.
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Auto from hours (8h day); override OK
               </p>
             </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Deadline</Label>
-              <Input
-                type="date"
-                value={form.deadline}
-                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                disabled={fieldsLocked}
-              />
-            </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Estimate (hours)</Label>
               <Input
                 type="number"
@@ -399,78 +470,24 @@ export function TaskFormModal({
                 disabled={fieldsLocked}
               />
             </div>
-          </div>
-
-          <div className={cn('space-y-2', fieldsLocked && 'opacity-60 pointer-events-none')}>
-            <Label>Assignees</Label>
-            <p className="text-xs text-muted-foreground">
-              Select one or more employees, or the client (not both). Choosing multiple
-              employees creates a separate task for each person.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={clearAssignees}
-                className={cn(
-                  'rounded-lg border px-3 py-1.5 text-sm transition-colors',
-                  isUnassigned
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-border text-muted-foreground hover:bg-secondary',
-                )}
-              >
-                Unassigned
-              </button>
-              {project?.client && (
-                <button
-                  type="button"
-                  onClick={() => assignClient(project.client!.id)}
-                  className={cn(
-                    'rounded-lg border px-3 py-1.5 text-sm transition-colors',
-                    form.assigned_to_client === project.client.id
-                      ? 'border-violet-500 bg-violet-50 text-violet-800 font-medium'
-                      : 'border-border text-muted-foreground hover:bg-secondary',
-                  )}
-                >
-                  Client · {project.client.name}
-                </button>
-              )}
+            <div className="space-y-1.5">
+              <Label>Deadline</Label>
+              <Input
+                type="date"
+                value={form.deadline}
+                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                disabled={fieldsLocked}
+              />
             </div>
-            {activeEmployees.length > 0 && (
-              <div className="mt-2 max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border">
-                {activeEmployees.map((e) => {
-                  const checked = form.assigned_to_ids.includes(e.id)
-                  return (
-                    <label
-                      key={e.id}
-                      className={cn(
-                        'flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40',
-                        checked && 'bg-primary/5',
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-border"
-                        checked={checked}
-                        onChange={() => toggleEmployee(e.id)}
-                      />
-                      <span className="font-medium">{e.name}</span>
-                      {e.designation?.designation && (
-                        <span className="ml-auto text-xs text-muted-foreground">
-                          {e.designation.designation}
-                        </span>
-                      )}
-                    </label>
-                  )
-                })}
-              </div>
-            )}
           </div>
 
+          {/* Attachments on create only */}
           {!task && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label className="flex items-center gap-2">
                 <Paperclip className="h-3.5 w-3.5" />
                 Attachments
+                <span className="font-normal text-muted-foreground">· optional · max 10 MB</span>
               </Label>
               <input
                 ref={fileRef}
@@ -482,44 +499,46 @@ export function TaskFormModal({
                   e.target.value = ''
                 }}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileRef.current?.click()}
-              >
-                <Paperclip className="h-3.5 w-3.5" />
-                Add files
-              </Button>
-              <p className="text-xs text-muted-foreground">Optional · max 10 MB per file</p>
-              {files.length > 0 && (
-                <ul className="space-y-1.5 pt-1">
-                  {files.map((file, index) => (
-                    <li
-                      key={`${file.name}-${file.size}-${index}`}
-                      className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
-                    >
-                      <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
-                      <span className="truncate flex-1">{file.name}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {formatFileSize(file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                        onClick={() => removeFile(index)}
-                        aria-label="Remove file"
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Add files
+                </Button>
+                {files.length > 0 && (
+                  <ul className="flex flex-wrap gap-1.5 flex-1 min-w-0">
+                    {files.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${index}`}
+                        className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs max-w-full"
                       >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <FileText className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                        <span className="truncate max-w-[10rem]">{file.name}</span>
+                        <span className="text-muted-foreground shrink-0">
+                          {formatFileSize(file.size)}
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded-md p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          onClick={() => removeFile(index)}
+                          aria-label="Remove file"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </div>
-        <DialogFooter>
+
+        <DialogFooter className="pt-1">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
