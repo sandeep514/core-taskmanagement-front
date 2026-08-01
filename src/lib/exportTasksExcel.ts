@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import {
