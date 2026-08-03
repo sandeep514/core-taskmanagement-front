@@ -12,7 +12,7 @@ import {
 import { fetchWorkReport } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/authStore'
-import { TASK_PRIORITIES } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES } from '@/types'
 import { cn, formatDate, todayDateString } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/loading'
@@ -91,7 +91,7 @@ export function WorkReportPage() {
     <div>
       <PageHeader
         title="Work Report"
-        description="Tasks marked Done in the selected period, filtered by employee."
+        description="Tasks in Employee Done, Testing, Client Review, or Done in the selected period."
       />
 
       <Card className="mb-5">
@@ -196,7 +196,7 @@ export function WorkReportPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
             <SummaryCard
               icon={CheckCircle2}
-              label="Tasks done"
+              label="Tasks"
               value={data.summary.tasks_done}
               color="bg-emerald-50 text-emerald-700"
             />
@@ -228,14 +228,14 @@ export function WorkReportPage() {
               </CardHeader>
               <CardContent>
                 {data.by_employee.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4">No completions in this period.</p>
+                  <p className="text-sm text-muted-foreground py-4">No matching tasks in this period.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="py-2 pr-2 font-medium">Employee</th>
-                          <th className="py-2 px-2 font-medium text-right">Done</th>
+                          <th className="py-2 px-2 font-medium text-right">Tasks</th>
                           <th className="py-2 pl-2 font-medium text-right">Hours</th>
                         </tr>
                       </thead>
@@ -264,14 +264,14 @@ export function WorkReportPage() {
               </CardHeader>
               <CardContent>
                 {data.by_project.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4">No completions in this period.</p>
+                  <p className="text-sm text-muted-foreground py-4">No matching tasks in this period.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="py-2 pr-2 font-medium">Project</th>
-                          <th className="py-2 px-2 font-medium text-right">Done</th>
+                          <th className="py-2 px-2 font-medium text-right">Tasks</th>
                           <th className="py-2 pl-2 font-medium text-right">Hours</th>
                         </tr>
                       </thead>
@@ -298,7 +298,7 @@ export function WorkReportPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                Completed tasks
+                Tasks
                 <Badge variant="secondary">{data.tasks.length}</Badge>
               </CardTitle>
             </CardHeader>
@@ -307,8 +307,8 @@ export function WorkReportPage() {
                 <div className="p-6">
                   <EmptyState
                     icon={ClipboardCheck}
-                    title="No tasks done"
-                    description="No tasks were marked Done in this period for the selected filters."
+                    title="No matching tasks"
+                    description="No tasks in Employee Done, Testing, Client Review, or Done for this period."
                   />
                 </div>
               ) : (
@@ -320,14 +320,16 @@ export function WorkReportPage() {
                         <th className="px-4 py-3 font-medium">Task</th>
                         <th className="px-4 py-3 font-medium">Project</th>
                         <th className="px-4 py-3 font-medium">Assignees</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
                         <th className="px-4 py-3 font-medium">Priority</th>
-                        <th className="px-4 py-3 font-medium">Completed</th>
+                        <th className="px-4 py-3 font-medium">Date</th>
                         <th className="px-4 py-3 font-medium text-right">Hours</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.tasks.map((task) => {
                         const priority = TASK_PRIORITIES.find((p) => p.value === task.priority)
+                        const status = TASK_STATUSES.find((s) => s.value === task.status)
                         return (
                           <tr
                             key={task.id}
@@ -346,6 +348,18 @@ export function WorkReportPage() {
                               {task.assignees.length
                                 ? task.assignees.map((a) => a.name).join(', ')
                                 : '—'}
+                            </td>
+                            <td className="px-4 py-3">
+                              {status && (
+                                <span
+                                  className={cn(
+                                    'inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold',
+                                    status.color,
+                                  )}
+                                >
+                                  {status.label}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               {priority && (
