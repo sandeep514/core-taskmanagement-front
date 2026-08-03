@@ -22,6 +22,7 @@ import { ClientProjectBoardPage } from '@/pages/client/ClientProjectBoardPage'
 import { MyAssignedTasksPage } from '@/pages/tasks/MyAssignedTasksPage'
 import { PersonalTodosPage } from '@/pages/todos/PersonalTodosPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { WorkReportPage } from '@/pages/reports/WorkReportPage'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 
 const queryClient = new QueryClient({
@@ -53,6 +54,7 @@ export default function App() {
                 <Route path="todos" element={<PersonalTodosPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
+                <Route path="work-report" element={<WorkReportPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Route>
@@ -62,6 +64,7 @@ export default function App() {
                 <Route index element={<MyProjectsPage />} />
                 <Route path="tasks" element={<MyAssignedTasksPage />} />
                 <Route path="todos" element={<PersonalTodosPage />} />
+                <Route path="work-report" element={<WorkReportPage />} />
                 <Route path="projects/:projectId" element={<ProjectBoardPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

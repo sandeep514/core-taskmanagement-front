@@ -1,5 +1,14 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ClipboardList, FolderKanban, ListTodo, LogOut, Menu, Settings, X } from 'lucide-react'
+import {
+  ChartColumn,
+  ClipboardList,
+  FolderKanban,
+  ListTodo,
+  LogOut,
+  Menu,
+  Settings,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 import { cn, initials } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -85,6 +94,20 @@ export function EmployeeLayout() {
               My Todos
             </NavLink>
             <NavLink
+              to="/employee/work-report"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                )
+              }
+            >
+              <ChartColumn className="h-4 w-4" />
+              Work Report
+            </NavLink>
+            <NavLink
               to="/employee/settings"
               className={({ isActive }) =>
                 cn(
@@ -151,6 +174,14 @@ export function EmployeeLayout() {
             >
               <ListTodo className="h-4 w-4" />
               My Todos
+            </NavLink>
+            <NavLink
+              to="/employee/work-report"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
+            >
+              <ChartColumn className="h-4 w-4" />
+              Work Report
             </NavLink>
             <NavLink
               to="/employee/settings"

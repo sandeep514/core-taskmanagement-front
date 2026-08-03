@@ -183,6 +183,50 @@ export interface DashboardStats {
   overdue_tasks: number
 }
 
+export interface WorkReportTaskRow {
+  id: number
+  title: string
+  project_id: number
+  project_name: string
+  priority: TaskPriority
+  status: TaskStatus
+  estimate_hours: number | null
+  actual_complete_on: string | null
+  assignees: { id: number; name: string }[]
+}
+
+export interface WorkReportEmployeeRow {
+  employee_id: number
+  employee_name: string
+  tasks_done: number
+  estimate_hours: number
+}
+
+export interface WorkReportProjectRow {
+  project_id: number
+  project_name: string
+  tasks_done: number
+  estimate_hours: number
+}
+
+export interface WorkReport {
+  from: string
+  to: string
+  employee_id: number | null
+  summary: {
+    tasks_done: number
+    estimate_hours_total: number
+    employees_count: number
+    projects_count: number
+  }
+  by_employee: WorkReportEmployeeRow[]
+  by_project: WorkReportProjectRow[]
+  tasks: WorkReportTaskRow[]
+  employees: Pick<Employee, 'id' | 'name' | 'email'>[]
+  /** Employee portal only — current user's id for default filter. */
+  default_employee_id?: number
+}
+
 export const TASK_STATUSES: { value: TaskStatus; label: string; color: string }[] = [
   { value: 'todo', label: 'To Do', color: 'bg-slate-100 text-slate-700 border-slate-200' },
   { value: 'discussion', label: 'Discussion', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },

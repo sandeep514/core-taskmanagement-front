@@ -15,6 +15,7 @@ import type {
   TaskStatus,
   TodoFilter,
   UserRole,
+  WorkReport,
 } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001/api'
@@ -560,6 +561,26 @@ export async function fetchCopyTargetProjects(): Promise<Project[]> {
     return fetchProjects()
   }
   return fetchMyProjects()
+}
+
+// ─── Work report (admin + employee) ─────────────────────────────────────────
+
+export async function fetchWorkReport(params: {
+  from: string
+  to: string
+  employee_id?: number | null
+}): Promise<WorkReport> {
+  const query: Record<string, string | number> = {
+    from: params.from,
+    to: params.to,
+  }
+  if (params.employee_id != null) {
+    query.employee_id = params.employee_id
+  }
+  const { data } = await api.get<WorkReport>(`/${portalBase()}/work-report`, {
+    params: query,
+  })
+  return data
 }
 
 // ─── Personal todos (admin + employee) ──────────────────────────────────────
