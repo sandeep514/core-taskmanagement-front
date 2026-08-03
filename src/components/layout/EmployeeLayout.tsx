@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  ChartColumn,
+  BarChart3,
   ClipboardList,
   FolderKanban,
   ListTodo,
@@ -16,6 +16,14 @@ import { ForceChangePasswordModal } from '@/components/auth/ForceChangePasswordM
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 
+const employeeNav = [
+  { to: '/employee', label: 'My Projects', shortLabel: 'Projects', icon: FolderKanban, end: true },
+  { to: '/employee/tasks', label: 'My Tasks', shortLabel: 'Tasks', icon: ClipboardList },
+  { to: '/employee/todos', label: 'My Todos', shortLabel: 'Todos', icon: ListTodo },
+  { to: '/employee/work-report', label: 'Work Report', shortLabel: 'Report', icon: BarChart3 },
+  { to: '/employee/settings', label: 'Settings', shortLabel: 'Settings', icon: Settings },
+] as const
+
 export function EmployeeLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
@@ -29,17 +37,17 @@ export function EmployeeLayout() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-4 lg:px-6">
+        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-3 px-4 lg:px-6">
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="md:hidden shrink-0"
             onClick={() => setMobileOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </Button>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white text-sm font-bold">
               TF
             </div>
@@ -49,83 +57,30 @@ export function EmployeeLayout() {
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-1 ml-6">
-            <NavLink
-              to="/employee"
-              end
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                )
-              }
-            >
-              <FolderKanban className="h-4 w-4" />
-              My Projects
-            </NavLink>
-            <NavLink
-              to="/employee/tasks"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                )
-              }
-            >
-              <ClipboardList className="h-4 w-4" />
-              My Tasks
-            </NavLink>
-            <NavLink
-              to="/employee/todos"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                )
-              }
-            >
-              <ListTodo className="h-4 w-4" />
-              My Todos
-            </NavLink>
-            <NavLink
-              to="/employee/work-report"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                )
-              }
-            >
-              <ChartColumn className="h-4 w-4" />
-              Work Report
-            </NavLink>
-            <NavLink
-              to="/employee/settings"
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                )
-              }
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </NavLink>
+          {/* Scrollable nav so Work Report is never clipped off-screen */}
+          <nav className="hidden md:flex items-center gap-0.5 ml-2 min-w-0 flex-1 overflow-x-auto scrollbar-thin py-1">
+            {employeeNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={'end' in item ? item.end : false}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0',
+                    isActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                  )
+                }
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="hidden lg:inline">{item.label}</span>
+                <span className="lg:hidden">{item.shortLabel}</span>
+              </NavLink>
+            ))}
           </nav>
 
-          <div className="flex-1" />
-
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
             <div className="hidden sm:block text-right">
               <p className="text-sm font-medium leading-none">{user?.name}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{user?.email}</p>
@@ -143,54 +98,32 @@ export function EmployeeLayout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 h-full w-64 bg-card p-4 shadow-xl">
+          <div className="absolute left-0 top-0 h-full w-64 bg-card p-4 shadow-xl overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <span className="font-semibold">Menu</span>
               <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <NavLink
-              to="/employee"
-              end
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
-            >
-              <FolderKanban className="h-4 w-4" />
-              My Projects
-            </NavLink>
-            <NavLink
-              to="/employee/tasks"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
-            >
-              <ClipboardList className="h-4 w-4" />
-              My Tasks
-            </NavLink>
-            <NavLink
-              to="/employee/todos"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
-            >
-              <ListTodo className="h-4 w-4" />
-              My Todos
-            </NavLink>
-            <NavLink
-              to="/employee/work-report"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary mb-1"
-            >
-              <ChartColumn className="h-4 w-4" />
-              Work Report
-            </NavLink>
-            <NavLink
-              to="/employee/settings"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </NavLink>
+            {employeeNav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={'end' in item ? item.end : false}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium mb-1',
+                    isActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-secondary',
+                  )
+                }
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </NavLink>
+            ))}
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Building2,
   Briefcase,
-  ChartColumn,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   FolderKanban,
@@ -31,7 +31,7 @@ const nav = [
   { to: '/admin/clients', label: 'Clients', icon: Briefcase },
   { to: '/admin/employees', label: 'Employees', icon: Users },
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
-  { to: '/admin/work-report', label: 'Work Report', icon: ChartColumn },
+  { to: '/admin/work-report', label: 'Work Report', icon: BarChart3 },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

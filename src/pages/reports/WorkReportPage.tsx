@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import { fetchWorkReport } from '@/lib/api'
+import { getApiError } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/authStore'
 import { TASK_PRIORITIES } from '@/types'
 import { cn, formatDate, todayDateString } from '@/lib/utils'
@@ -41,26 +42,33 @@ export function WorkReportPage() {
   const isAdmin = user?.role === 'admin'
   const isEmployee = user?.role === 'employee'
 
-  const [from, setFrom] = useState(firstDayOfMonth)
-  const [to, setTo] = useState(todayDateString)
-  const [employeeId, setEmployeeId] = useState<string>(
+  const [from, setFrom] = useState(() => firstDayOfMonth())
+  const [to, setTo] = useState(() => todayDateString())
+  const [employeeId, setEmployeeId] = useState<string>(() =>
     isEmployee && user?.id ? String(user.id) : 'all',
   )
-  const [applied, setApplied] = useState({
+  const [applied, setApplied] = useState(() => ({
     from: firstDayOfMonth(),
     to: todayDateString(),
-    employee_id: isEmployee && user?.id ? user.id : (null as number | null),
-  })
+    employee_id: (isEmployee && user?.id ? user.id : null) as number | null,
+  }))
 
   const { data, isLoading, isFetching, isError, refetch, error } = useQuery({
-    queryKey: ['work-report', applied.from, applied.to, applied.employee_id],
+    queryKey: [
+      'work-report',
+      user?.role,
+      applied.from,
+      applied.to,
+      applied.employee_id,
+    ],
     queryFn: () =>
       fetchWorkReport({
         from: applied.from,
         to: applied.to,
         employee_id: applied.employee_id,
+        role: user?.role,
       }),
-    enabled: Boolean(applied.from && applied.to),
+    enabled: Boolean(user && applied.from && applied.to),
   })
 
   const employees = data?.employees ?? []
@@ -154,8 +162,11 @@ export function WorkReportPage() {
       ) : isError ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center">
           <p className="font-medium">Could not load work report</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {(error as Error)?.message || 'Check that the API is running.'}
+          <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            {getApiError(
+              error,
+              'Check that the Laravel API is running and includes GET /api/employee/work-report (or /api/admin/work-report).',
+            )}
           </p>
           <Button variant="link" className="mt-2" onClick={() => refetch()}>
             Retry

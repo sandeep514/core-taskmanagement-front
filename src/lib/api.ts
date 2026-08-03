@@ -569,15 +569,18 @@ export async function fetchWorkReport(params: {
   from: string
   to: string
   employee_id?: number | null
+  /** Prefer passing role so the call never hits the wrong portal prefix. */
+  role?: UserRole | null
 }): Promise<WorkReport> {
   const query: Record<string, string | number> = {
     from: params.from,
     to: params.to,
   }
-  if (params.employee_id != null) {
-    query.employee_id = params.employee_id
+  if (params.employee_id != null && !Number.isNaN(Number(params.employee_id))) {
+    query.employee_id = Number(params.employee_id)
   }
-  const { data } = await api.get<WorkReport>(`/${portalBase()}/work-report`, {
+  const base = portalBase(params.role)
+  const { data } = await api.get<WorkReport>(`/${base}/work-report`, {
     params: query,
   })
   return data
