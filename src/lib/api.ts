@@ -1,11 +1,13 @@
 import axios from 'axios'
 import type {
+  ActivityLogListResponse,
   AuthUser,
   Client,
   DashboardStats,
   Department,
   Designation,
   Employee,
+  HrUser,
   LoginResponse,
   PersonalTodo,
   Project,
@@ -28,13 +30,17 @@ const api = axios.create({
   },
 })
 
-/** Current portal role for task/project endpoint prefixes */
+/** Current portal role for task/project endpoint prefixes.
+ * HR shares admin API routes (ability:admin,hr).
+ */
 function portalBase(role?: UserRole | null): 'admin' | 'employee' | 'client' {
+  if (role === 'hr') return 'admin'
   if (role === 'admin' || role === 'employee' || role === 'client') return role
   try {
     const raw = localStorage.getItem('taskflow_user')
     if (raw) {
       const user = JSON.parse(raw) as AuthUser
+      if (user.role === 'hr') return 'admin'
       if (user.role === 'admin' || user.role === 'employee' || user.role === 'client') {
         return user.role
       }
@@ -47,8 +53,24 @@ function portalBase(role?: UserRole | null): 'admin' | 'employee' | 'client' {
 
 export function homePathForRole(role: UserRole): string {
   if (role === 'admin') return '/admin'
+  if (role === 'hr') return '/hr'
   if (role === 'client') return '/client'
   return '/employee'
+}
+
+/** UI path prefix for admin-like portals (admin vs hr). */
+export function portalUiBase(role?: UserRole | null): '/admin' | '/hr' {
+  if (role === 'hr') return '/hr'
+  try {
+    const raw = localStorage.getItem('taskflow_user')
+    if (raw) {
+      const user = JSON.parse(raw) as AuthUser
+      if (user.role === 'hr') return '/hr'
+    }
+  } catch {
+    // ignore
+  }
+  return '/admin'
 }
 
 api.interceptors.request.use((config) => {
@@ -132,6 +154,11 @@ function normalizeProjectPayload(payload: ProjectFormData) {
 
 export async function loginAdmin(email: string, password: string): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/admin/login', { email, password })
+  return data
+}
+
+export async function loginHr(email: string, password: string): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/hr/login', { email, password })
   return data
 }
 
@@ -563,7 +590,7 @@ export async function fetchCopyTargetProjects(): Promise<Project[]> {
   return fetchMyProjects()
 }
 
-// ─── Work report (admin + employee) ─────────────────────────────────────────
+// ─── Work report (admin + hr + employee) ────────────────────────────────────
 
 export async function fetchWorkReport(params: {
   from: string
@@ -583,6 +610,72 @@ export async function fetchWorkReport(params: {
   const { data } = await api.get<WorkReport>(`/${base}/work-report`, {
     params: query,
   })
+  return data
+}
+
+// ─── Activity logs (admin + HR) ─────────────────────────────────────────────
+
+export async function fetchActivityLogs(params?: {
+  user_type?: 'employee' | 'hr' | 'admin' | 'client' | ''
+  user_id?: number | null
+  action?: string
+  project_id?: number | null
+  from?: string
+  to?: string
+  page?: number
+  per_page?: number
+}): Promise<ActivityLogListResponse> {
+  const query: Record<string, string | number> = {}
+  if (params?.user_type) query.user_type = params.user_type
+  if (params?.user_id != null) query.user_id = params.user_id
+  if (params?.action) query.action = params.action
+  if (params?.project_id != null) query.project_id = params.project_id
+  if (params?.from) query.from = params.from
+  if (params?.to) query.to = params.to
+  if (params?.page) query.page = params.page
+  if (params?.per_page) query.per_page = params.per_page
+
+  const { data } = await api.get<ActivityLogListResponse>('/admin/activity-logs', {
+    params: query,
+  })
+  return data
+}
+
+// ─── Admin: HR accounts ─────────────────────────────────────────────────────
+
+export async function fetchHrs(): Promise<HrUser[]> {
+  const { data } = await api.get<HrUser[]>('/admin/hrs')
+  return data
+}
+
+export async function createHr(
+  payload: Partial<HrUser> & { password?: string },
+): Promise<HrUser> {
+  const { data } = await api.post<HrUser>('/admin/hrs', {
+    name: payload.name,
+    email: payload.email,
+    password: payload.password || undefined,
+    status: payload.status ?? 'active',
+  })
+  return data
+}
+
+export async function updateHr(
+  id: number,
+  payload: Partial<HrUser> & { password?: string },
+): Promise<HrUser> {
+  const body: Record<string, unknown> = {
+    name: payload.name,
+    email: payload.email,
+    status: payload.status,
+  }
+  if (payload.password) body.password = payload.password
+  const { data } = await api.put<HrUser>(`/admin/hrs/${id}`, body)
+  return data
+}
+
+export async function toggleHrStatus(id: number): Promise<HrUser> {
+  const { data } = await api.post<HrUser>(`/admin/hrs/${id}/toggle-status`)
   return data
 }
 

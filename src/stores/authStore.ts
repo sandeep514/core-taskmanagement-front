@@ -63,9 +63,11 @@ export const useAuthStore = create<AuthState>()(
         const res =
           role === 'admin'
             ? await api.loginAdmin(email, password)
-            : role === 'client'
-              ? await api.loginClient(email, password)
-              : await api.loginEmployee(email, password)
+            : role === 'hr'
+              ? await api.loginHr(email, password)
+              : role === 'client'
+                ? await api.loginClient(email, password)
+                : await api.loginEmployee(email, password)
 
         const user: AuthUser = {
           ...res.user,

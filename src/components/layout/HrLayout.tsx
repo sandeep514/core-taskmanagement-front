@@ -1,19 +1,17 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Activity,
-  Building2,
-  Briefcase,
   BarChart3,
+  Briefcase,
+  Building2,
   ChevronLeft,
   ChevronRight,
   FolderKanban,
   LayoutDashboard,
-  ListTodo,
   LogOut,
   Menu,
   Settings,
   Users,
-  UserCog,
   BadgeCheck,
   X,
 } from 'lucide-react'
@@ -26,20 +24,18 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
 const nav = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/todos', label: 'My Todos', icon: ListTodo },
-  { to: '/admin/designations', label: 'Designations', icon: BadgeCheck },
-  { to: '/admin/departments', label: 'Departments', icon: Building2 },
-  { to: '/admin/clients', label: 'Clients', icon: Briefcase },
-  { to: '/admin/employees', label: 'Employees', icon: Users },
-  { to: '/admin/hrs', label: 'HR Accounts', icon: UserCog },
-  { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
-  { to: '/admin/activity-logs', label: 'Activity Logs', icon: Activity },
-  { to: '/admin/work-report', label: 'Work Report', icon: BarChart3 },
-  { to: '/admin/settings', label: 'Settings', icon: Settings },
+  { to: '/hr', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/hr/designations', label: 'Designations', icon: BadgeCheck },
+  { to: '/hr/departments', label: 'Departments', icon: Building2 },
+  { to: '/hr/clients', label: 'Clients', icon: Briefcase },
+  { to: '/hr/employees', label: 'Employees', icon: Users },
+  { to: '/hr/projects', label: 'Projects', icon: FolderKanban },
+  { to: '/hr/activity-logs', label: 'Activity Logs', icon: Activity },
+  { to: '/hr/work-report', label: 'Work Report', icon: BarChart3 },
+  { to: '/hr/settings', label: 'Settings', icon: Settings },
 ]
 
-export function AdminLayout() {
+export function HrLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
@@ -53,13 +49,13 @@ export function AdminLayout() {
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className={cn('flex items-center gap-3 px-4 py-5', collapsed && 'justify-center px-2')}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-500/30">
-          TF
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white font-bold shadow-lg shadow-teal-500/30">
+          HR
         </div>
         {!collapsed && (
           <div className="min-w-0">
             <p className="font-semibold text-white truncate">TaskFlow</p>
-            <p className="text-xs text-slate-400">Admin Portal</p>
+            <p className="text-xs text-slate-400">HR Portal</p>
           </div>
         )}
       </div>
@@ -92,8 +88,8 @@ export function AdminLayout() {
       <div className="p-3 border-t border-sidebar-border">
         <div className={cn('flex items-center gap-3 rounded-lg p-2', collapsed && 'justify-center')}>
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-indigo-600 text-white">
-              {initials(user?.name || 'A')}
+            <AvatarFallback className="bg-teal-600 text-white">
+              {initials(user?.name || 'H')}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
@@ -130,7 +126,6 @@ export function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Desktop sidebar */}
       <aside
         className={cn(
           'hidden lg:flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-200 sticky top-0 h-screen',
@@ -147,7 +142,6 @@ export function AdminLayout() {
         </button>
       </aside>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileOpen(false)} />
@@ -175,8 +169,8 @@ export function AdminLayout() {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex-1" />
-          <span className="hidden sm:inline text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-md">
-            Admin · live API
+          <span className="hidden sm:inline text-xs text-muted-foreground bg-teal-50 text-teal-700 px-2 py-1 rounded-md">
+            HR · live API
           </span>
         </header>
 

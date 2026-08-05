@@ -123,7 +123,12 @@ export function canChangeTaskStatus(
   _newStatus?: string | null,
 ): boolean {
   if (!user) return false
-  return user.role === 'admin' || user.role === 'employee' || user.role === 'client'
+  return (
+    user.role === 'admin' ||
+    user.role === 'hr' ||
+    user.role === 'employee' ||
+    user.role === 'client'
+  )
 }
 
 /** Status options a user may pick (null = all statuses). */
@@ -138,7 +143,12 @@ export function allowedTaskStatusesForUser(
   user: { id: number; role?: string } | null | undefined,
 ): string[] | null {
   if (!user) return []
-  if (user.role === 'admin' || user.role === 'employee' || user.role === 'client') {
+  if (
+    user.role === 'admin' ||
+    user.role === 'hr' ||
+    user.role === 'employee' ||
+    user.role === 'client'
+  ) {
     return null
   }
   return []
@@ -200,7 +210,7 @@ export function isProjectManagerUser(user: {
 
 /**
  * Full field edits (title, assignees, etc.).
- * Creator always; project managers may edit all tasks on projects they access.
+ * Admin/HR org-wide; creator always; project managers on assigned projects.
  */
 export function canEditTask(
   task: {
@@ -215,6 +225,8 @@ export function canEditTask(
   } | null | undefined,
 ): boolean {
   if (!user || !task) return false
+  // Admin and HR may manage any task (assign, edit, handle clients).
+  if (user.role === 'admin' || user.role === 'hr') return true
   // PMs can edit any task on assigned projects (API also enforces project membership).
   if (isProjectManagerUser(user)) return true
   if (task.created_by == null || !task.created_by_type) return false

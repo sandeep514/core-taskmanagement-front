@@ -10,14 +10,17 @@ import {
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { fetchAdminDashboard, fetchProjects, fetchEmployees } from '@/lib/api'
+import { fetchAdminDashboard, fetchProjects, fetchEmployees, portalUiBase } from '@/lib/api'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageLoader } from '@/components/ui/loading'
 import { formatDate } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 
 export function DashboardPage() {
+  const user = useAuthStore((s) => s.user)
+  const basePath = portalUiBase(user?.role)
   const { data: stats, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: fetchAdminDashboard,
@@ -51,28 +54,28 @@ export function DashboardPage() {
       value: stats.total_projects,
       icon: FolderKanban,
       color: 'bg-indigo-50 text-indigo-600',
-      to: '/admin/projects',
+      to: `${basePath}/projects`,
     },
     {
       label: 'Employees',
       value: stats.total_employees,
       icon: Users,
       color: 'bg-sky-50 text-sky-600',
-      to: '/admin/employees',
+      to: `${basePath}/employees`,
     },
     {
       label: 'Clients',
       value: stats.total_clients,
       icon: Briefcase,
       color: 'bg-violet-50 text-violet-600',
-      to: '/admin/clients',
+      to: `${basePath}/clients`,
     },
     {
       label: 'Total Tasks',
       value: stats.total_tasks,
       icon: ListTodo,
       color: 'bg-emerald-50 text-emerald-600',
-      to: '/admin/projects',
+      to: `${basePath}/projects`,
     },
   ]
 
@@ -158,7 +161,7 @@ export function DashboardPage() {
             {(projects ?? []).slice(0, 5).map((p) => (
               <Link
                 key={p.id}
-                to={`/admin/projects/${p.id}`}
+                to={`${basePath}/projects/${p.id}`}
                 className="flex items-center justify-between rounded-lg border border-border p-3 hover:bg-secondary/40 transition-colors group"
               >
                 <div className="min-w-0">

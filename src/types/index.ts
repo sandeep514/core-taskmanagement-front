@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'employee' | 'client'
+export type UserRole = 'admin' | 'hr' | 'employee' | 'client'
 
 export type TaskStatus =
   | 'todo'
@@ -108,7 +108,7 @@ export interface TaskComment {
   id: number
   task_id: number
   user_id: number
-  user_type: 'admin' | 'employee' | 'client'
+  user_type: 'admin' | 'hr' | 'employee' | 'client'
   comment: string
   user_name?: string
   created_at: string
@@ -119,13 +119,51 @@ export interface TaskActivityLog {
   id: number
   task_id: number
   user_id: number | null
-  user_type: 'admin' | 'employee' | 'client' | null
+  user_type: 'admin' | 'hr' | 'employee' | 'client' | null
   action: string
   from_value: string | null
   to_value: string | null
   message: string | null
   user_name?: string | null
   meta?: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+/** Global activity feed row (admin / HR activity logs page). */
+export interface ActivityLogEntry {
+  id: number
+  task_id: number
+  task_title?: string | null
+  project_id?: number | null
+  project_name?: string | null
+  user_id: number | null
+  user_type: 'admin' | 'hr' | 'employee' | 'client' | null
+  user_name?: string | null
+  action: string
+  from_value: string | null
+  to_value: string | null
+  message: string | null
+  meta?: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface ActivityLogListResponse {
+  data: ActivityLogEntry[]
+  meta: {
+    current_page: number
+    last_page: number
+    per_page: number
+    total: number
+  }
+}
+
+/** HR portal user managed by admin. */
+export interface HrUser {
+  id: number
+  name: string
+  email: string
+  status: EntityStatus
   created_at: string
   updated_at: string
 }
@@ -149,9 +187,9 @@ export interface Task {
   assigned_to_ids?: number[]
   assigned_to_client?: number | null
   created_by: number | null
-  /** Who created the task: admin | employee | client */
-  created_by_type?: 'admin' | 'employee' | 'client' | null
-  /** Resolved display name from API (e.g. "Admin · Jane", "Client · Acme") */
+  /** Who created the task: admin | hr | employee | client */
+  created_by_type?: 'admin' | 'hr' | 'employee' | 'client' | null
+  /** Resolved display name from API (e.g. "Admin · Jane", "HR · Sam", "Client · Acme") */
   created_by_name?: string | null
   priority: TaskPriority
   task_type: TaskType

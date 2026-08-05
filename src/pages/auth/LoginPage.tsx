@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Briefcase, Eye, EyeOff, Loader2, Shield, User } from 'lucide-react'
+import { Briefcase, Eye, EyeOff, Loader2, Shield, User, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/authStore'
 import type { UserRole } from '@/types'
@@ -13,8 +13,16 @@ import { homePathForRole } from '@/lib/api'
 
 const roleDefaults: Record<UserRole, string> = {
   admin: '',
+  hr: '',
   employee: '',
   client: '',
+}
+
+const roleLabels: Record<UserRole, string> = {
+  admin: 'Admin',
+  hr: 'HR',
+  employee: 'Employee',
+  client: 'Client',
 }
 
 export function LoginPage() {
@@ -49,9 +57,6 @@ export function LoginPage() {
     }
   }
 
-  const roleLabel =
-    role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : 'Client'
-
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="relative hidden lg:flex flex-col justify-between bg-slate-950 p-12 text-white overflow-hidden">
@@ -68,24 +73,25 @@ export function LoginPage() {
 
         <div className="relative z-10 max-w-md">
           <h1 className="text-4xl font-bold leading-tight tracking-tight">
-            Admin, team &amp; client portals
+            Admin, HR, team &amp; client portals
           </h1>
           <p className="mt-4 text-slate-400 text-lg leading-relaxed">
-            Manage organization setup, employee Kanban boards, and let clients track and
-            contribute to their project tasks.
+            Manage organization setup, HR client handling, employee Kanban boards, and let
+            clients track and contribute to their project tasks.
           </p>
 
-          <div className="mt-10 grid grid-cols-3 gap-4">
+          <div className="mt-10 grid grid-cols-4 gap-3">
             {[
               { label: 'Admin', value: 'Org' },
+              { label: 'HR', value: 'People' },
               { label: 'Employee', value: 'Team' },
               { label: 'Client', value: 'Portal' },
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur"
+                className="rounded-xl border border-white/10 bg-white/5 p-3 backdrop-blur"
               >
-                <p className="text-2xl font-bold text-white">{stat.value}</p>
+                <p className="text-xl font-bold text-white">{stat.value}</p>
                 <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
               </div>
             ))}
@@ -111,10 +117,11 @@ export function LoginPage() {
             Choose your portal and enter your credentials
           </p>
 
-          <div className="mt-6 grid grid-cols-3 gap-1 rounded-xl bg-secondary p-1">
+          <div className="mt-6 grid grid-cols-4 gap-1 rounded-xl bg-secondary p-1">
             {(
               [
                 { key: 'admin' as const, icon: Shield, label: 'Admin' },
+                { key: 'hr' as const, icon: UserCog, label: 'HR' },
                 { key: 'employee' as const, icon: User, label: 'Employee' },
                 { key: 'client' as const, icon: Briefcase, label: 'Client' },
               ] as const
@@ -124,7 +131,7 @@ export function LoginPage() {
                 type="button"
                 onClick={() => switchRole(key)}
                 className={cn(
-                  'flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs sm:text-sm font-medium transition-all',
+                  'flex flex-col sm:flex-row items-center justify-center gap-1 rounded-lg py-2.5 text-[11px] sm:text-sm font-medium transition-all',
                   role === key
                     ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -180,11 +187,9 @@ export function LoginPage() {
 
             <Button type="submit" className="w-full h-11" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Sign in as {roleLabel}
+              Sign in as {roleLabels[role]}
             </Button>
           </form>
-
-          
         </div>
       </div>
     </div>

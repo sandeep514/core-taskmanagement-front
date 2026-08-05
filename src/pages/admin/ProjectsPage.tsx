@@ -9,10 +9,12 @@ import {
   fetchDepartments,
   fetchEmployees,
   fetchProjects,
+  portalUiBase,
   toggleProjectStatus,
   updateProject,
 } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
+import { useAuthStore } from '@/stores/authStore'
 import type { Project, ProjectFormData } from '@/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -56,6 +58,8 @@ const emptyForm: ProjectFormData = {
 
 export function ProjectsPage() {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const basePath = portalUiBase(user?.role)
   const { data, isLoading } = useQuery({ queryKey: ['projects'], queryFn: fetchProjects })
   const { data: clients } = useQuery({ queryKey: ['clients'], queryFn: fetchClients })
   const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: fetchDepartments })
@@ -208,7 +212,7 @@ export function ProjectsPage() {
 
                 <div className="mt-4 pt-3 border-t border-border">
                   <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link to={`/admin/projects/${item.id}`}>
+                    <Link to={`${basePath}/projects/${item.id}`}>
                       <Columns3 className="h-4 w-4" />
                       Open Kanban Board
                     </Link>

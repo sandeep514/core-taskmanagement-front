@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Plus } from 'lucide-react'
-import { fetchProject, fetchProjectTasks } from '@/lib/api'
+import { fetchProject, fetchProjectTasks, portalUiBase } from '@/lib/api'
+import { useAuthStore } from '@/stores/authStore'
 import type { Task } from '@/types'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,8 @@ import { useProjectTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 export function AdminProjectBoardPage() {
   const { projectId } = useParams()
   const id = Number(projectId)
+  const user = useAuthStore((s) => s.user)
+  const basePath = portalUiBase(user?.role)
 
   useProjectTasksRealtime(id)
 
@@ -62,7 +65,7 @@ export function AdminProjectBoardPage() {
       <div className="text-center py-20">
         <p className="text-muted-foreground">Project not found</p>
         <Button asChild variant="link" className="mt-2">
-          <Link to="/admin/projects">Back to projects</Link>
+          <Link to={`${basePath}/projects`}>Back to projects</Link>
         </Button>
       </div>
     )
@@ -89,7 +92,7 @@ export function AdminProjectBoardPage() {
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
-            to="/admin/projects"
+            to={`${basePath}/projects`}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2"
           >
             <ArrowLeft className="h-4 w-4" />
