@@ -209,10 +209,11 @@ export function isProjectManagerUser(user: {
 }
 
 /**
- * Soft-delete attachment: task creator, admin, or HR.
+ * Soft-delete attachment: any authenticated portal user who can open the task
+ * (same people who can upload). API enforces project access + required remark.
  */
 export function canDeleteTaskAttachment(
-  task: {
+  _task: {
     created_by?: number | null
     created_by_type?: string | null
   } | null | undefined,
@@ -221,9 +222,13 @@ export function canDeleteTaskAttachment(
     role?: string
   } | null | undefined,
 ): boolean {
-  if (!user || !task) return false
-  if (user.role === 'admin' || user.role === 'hr') return true
-  return isTaskCreator(task, user)
+  if (!user?.role) return false
+  return (
+    user.role === 'admin' ||
+    user.role === 'hr' ||
+    user.role === 'employee' ||
+    user.role === 'client'
+  )
 }
 
 /**

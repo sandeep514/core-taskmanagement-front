@@ -91,6 +91,7 @@ export function TaskDetailModal({
   })
 
   const mayEdit = canEditTask(task, user)
+  // Show delete whenever the user is logged into a portal role (upload is also open).
   const mayDeleteAttachment = canDeleteTaskAttachment(task, user)
   const creatorLabel = task ? formatTaskCreator(task) : '—'
 
@@ -413,7 +414,7 @@ export function TaskDetailModal({
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="truncate flex-1 font-medium text-foreground hover:text-indigo-600 hover:underline"
+                            className="min-w-0 truncate flex-1 font-medium text-foreground hover:text-indigo-600 hover:underline"
                             title={a.file_name}
                           >
                             {a.file_name}
@@ -421,6 +422,7 @@ export function TaskDetailModal({
                           <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
                             {formatDate(a.created_at)}
                           </span>
+                          <div className="flex shrink-0 items-center gap-0.5">
                           <a
                             href={href}
                             target="_blank"
@@ -440,10 +442,10 @@ export function TaskDetailModal({
                             <Download className="h-3.5 w-3.5" />
                             <span className="sr-only">Download</span>
                           </a>
-                          {mayDeleteAttachment && (
+                          {mayDeleteAttachment ? (
                             <button
                               type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
                               title="Delete attachment"
                               disabled={deleteAttachMutation.isPending}
                               onClick={() => {
@@ -455,11 +457,12 @@ export function TaskDetailModal({
                               deleteAttachMutation.variables?.attachmentId === a.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-4 w-4" />
                               )}
                               <span className="sr-only">Delete</span>
                             </button>
-                          )}
+                          ) : null}
+                          </div>
                         </li>
                       )
                     })}

@@ -559,7 +559,7 @@ export async function addTaskAttachment(taskId: number, file: File): Promise<voi
 
 /**
  * Soft-delete attachment. Requires a remark (reason).
- * Allowed for task creator, admin, or HR (enforced by API).
+ * Any portal user with task access (enforced by API).
  */
 export async function deleteTaskAttachment(
   taskId: number,
