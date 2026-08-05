@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, ListPlus, Plus } from 'lucide-react'
 import { fetchProject, fetchProjectTasks } from '@/lib/api'
 import type { Task } from '@/types'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
+import { BulkAddTasksModal } from '@/components/tasks/BulkAddTasksModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import {
@@ -56,6 +57,7 @@ export function ProjectBoardPage() {
   })
 
   const [formOpen, setFormOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -157,6 +159,10 @@ export function ProjectBoardPage() {
             fileName={`${project.project_name}-tasks`}
             contextLabel={project.project_name}
           />
+          <Button variant="outline" onClick={() => setBulkOpen(true)}>
+            <ListPlus className="h-4 w-4" />
+            Bulk add
+          </Button>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />
             New Task
@@ -172,6 +178,8 @@ export function ProjectBoardPage() {
         projectId={id}
         task={editingTask}
       />
+
+      <BulkAddTasksModal open={bulkOpen} onOpenChange={setBulkOpen} projectId={id} />
 
       <TaskDetailModal
         open={detailOpen}

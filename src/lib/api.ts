@@ -14,7 +14,9 @@ import type {
   ProjectFormData,
   Task,
   TaskFormData,
+  TaskPriority,
   TaskStatus,
+  TaskType,
   TodoFilter,
   UserRole,
   WorkReport,
@@ -518,6 +520,63 @@ export async function createTask(projectId: number, payload: TaskFormData): Prom
     return data.tasks
   }
   return [data as Task]
+}
+
+/**
+ * Bulk create: one task per title (max 50). Shared type / priority / assignees.
+ * Multi-employee assignees still create one task per person per title.
+ */
+export async function bulkCreateTasks(
+  projectId: number,
+  payload: {
+    titles: string[]
+    task_type?: TaskType
+    priority?: TaskPriority
+    status?: TaskStatus
+    assigned_to_ids?: number[]
+    assigned_to_client?: number | null
+  },
+): Promise<Task[]> {
+  const { data } = await api.post<{ tasks: Task[]; count: number }>(
+    `/${portalBase()}/tasks/bulk`,
+    {
+      project_id: projectId,
+      titles: payload.titles,
+      task_type: payload.task_type ?? 'general',
+      priority: payload.priority ?? 'medium',
+      status: payload.status ?? 'todo',
+      assigned_to_ids: payload.assigned_to_ids ?? [],
+      assigned_to_client: payload.assigned_to_client ?? null,
+    },
+  )
+  return data.tasks ?? []
+}
+
+/** Parse bulk-add textarea: one title per line, strip bullets/numbers. */
+export function parseBulkTaskTitles(text: string, max = 50): string[] {
+  const lines = text.split(/\r?\n/)
+  const titles: string[] = []
+  const seen = new Set<string>()
+
+  for (const raw of lines) {
+    let line = raw.trim()
+    if (!line) continue
+    // Bullets / numbered lists
+    line = line
+      .replace(/^[-*•◦▪▸►]+\s+/, '')
+      .replace(/^\d+[.)]\s+/, '')
+      .replace(/^[a-zA-Z][.)]\s+/, '')
+      .trim()
+    if (!line) continue
+    if (line.length > 255) line = line.slice(0, 255)
+    const key = line.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    titles.push(line)
+    if (titles.length >= max) break
+  }
+
+  return titles
 }
 
 export async function updateTask(
