@@ -6,8 +6,10 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Eye,
   FileText,
   History,
+  ImageIcon,
   Loader2,
   MessageSquare,
   Paperclip,
@@ -28,6 +30,20 @@ import {
 } from '@/lib/api'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
+
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i
+
+function isImageAttachment(a: {
+  mime_type?: string | null
+  file_name?: string | null
+  file_path?: string | null
+}): boolean {
+  const mime = (a.mime_type ?? '').toLowerCase()
+  if (mime.startsWith('image/')) return true
+  if (IMAGE_EXT.test(a.file_name ?? '')) return true
+  if (IMAGE_EXT.test(a.file_path ?? '')) return true
+  return false
+}
 import {
   canDeleteTaskAttachment,
   canEditTask,
@@ -83,6 +99,10 @@ export function TaskDetailModal({
     file_name: string
   } | null>(null)
   const [deleteRemark, setDeleteRemark] = useState('')
+  const [imagePreview, setImagePreview] = useState<{
+    url: string
+    file_name: string
+  } | null>(null)
 
   const { data: task, isLoading } = useQuery({
     queryKey: ['task', taskId],
@@ -404,35 +424,67 @@ export function TaskDetailModal({
                   <ul className="space-y-2">
                     {task.attachments?.map((a) => {
                       const href = attachmentUrl(a)
+                      const isImage = isImageAttachment(a)
+                      const openAttachment = () => {
+                        if (isImage) {
+                          setImagePreview({ url: href, file_name: a.file_name })
+                        } else if (href) {
+                          window.open(href, '_blank', 'noopener,noreferrer')
+                        }
+                      }
                       return (
                         <li
                           key={a.id}
                           className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
                         >
-                          <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="min-w-0 truncate flex-1 font-medium text-foreground hover:text-indigo-600 hover:underline"
-                            title={a.file_name}
+                          {isImage ? (
+                            <button
+                              type="button"
+                              onClick={openAttachment}
+                              className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-secondary"
+                              title="Preview image"
+                            >
+                              <img
+                                src={href}
+                                alt={a.file_name}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </button>
+                          ) : (
+                            <FileText className="h-4 w-4 text-indigo-500 shrink-0" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={openAttachment}
+                            className="min-w-0 truncate flex-1 text-left font-medium text-foreground hover:text-indigo-600 hover:underline"
+                            title={
+                              isImage
+                                ? `Preview ${a.file_name}`
+                                : `Open ${a.file_name}`
+                            }
                           >
                             {a.file_name}
-                          </a>
+                          </button>
                           <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
                             {formatDate(a.created_at)}
                           </span>
                           <div className="flex shrink-0 items-center gap-0.5">
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={openAttachment}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-                            title="View / download"
+                            title={isImage ? 'Preview image' : 'Open in new tab'}
                           >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            <span className="sr-only">View</span>
-                          </a>
+                            {isImage ? (
+                              <Eye className="h-3.5 w-3.5" />
+                            ) : (
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            )}
+                            <span className="sr-only">
+                              {isImage ? 'Preview' : 'Open'}
+                            </span>
+                          </button>
                           <a
                             href={href}
                             download={a.file_name}
@@ -579,6 +631,44 @@ export function TaskDetailModal({
       task={task ?? null}
       sourceProjectId={projectId}
     />
+
+    <Dialog
+      open={!!imagePreview}
+      onOpenChange={(next) => {
+        if (!next) setImagePreview(null)
+      }}
+    >
+      <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-4 py-3 border-b border-border">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold truncate pr-8">
+            <ImageIcon className="h-4 w-4 shrink-0 text-indigo-500" />
+            <span className="truncate">{imagePreview?.file_name ?? 'Image'}</span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex max-h-[75vh] items-center justify-center bg-slate-950/95 p-3 sm:p-4">
+          {imagePreview?.url ? (
+            <img
+              src={imagePreview.url}
+              alt={imagePreview.file_name}
+              className="max-h-[70vh] max-w-full rounded-md object-contain shadow-lg"
+            />
+          ) : null}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+          {imagePreview?.url ? (
+            <Button variant="outline" size="sm" asChild>
+              <a href={imagePreview.url} download={imagePreview.file_name}>
+                <Download className="h-3.5 w-3.5" />
+                Download
+              </a>
+            </Button>
+          ) : null}
+          <Button size="sm" onClick={() => setImagePreview(null)}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
 
     <Dialog
       open={!!deleteTarget}
