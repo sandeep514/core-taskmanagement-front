@@ -209,6 +209,24 @@ export function isProjectManagerUser(user: {
 }
 
 /**
+ * Soft-delete attachment: task creator, admin, or HR.
+ */
+export function canDeleteTaskAttachment(
+  task: {
+    created_by?: number | null
+    created_by_type?: string | null
+  } | null | undefined,
+  user: {
+    id: number
+    role?: string
+  } | null | undefined,
+): boolean {
+  if (!user || !task) return false
+  if (user.role === 'admin' || user.role === 'hr') return true
+  return isTaskCreator(task, user)
+}
+
+/**
  * Full field edits (title, assignees, etc.).
  * Admin/HR org-wide; creator always; project managers on assigned projects.
  */

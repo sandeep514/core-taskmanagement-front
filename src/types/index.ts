@@ -100,6 +100,9 @@ export interface TaskAttachment {
   file_size?: number | null
   /** Public storage URL (from API when available). */
   url?: string | null
+  /** Soft-delete reason (only set after delete; active attachments omit this). */
+  delete_remark?: string | null
+  deleted_at?: string | null
   created_at: string
   updated_at: string
 }

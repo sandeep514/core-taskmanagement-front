@@ -557,13 +557,18 @@ export async function addTaskAttachment(taskId: number, file: File): Promise<voi
   await api.post(`/${portalBase()}/tasks/${taskId}/attachments`, form)
 }
 
-/** Delete attachment — only allowed for the task creator (enforced by API). */
+/**
+ * Soft-delete attachment. Requires a remark (reason).
+ * Allowed for task creator, admin, or HR (enforced by API).
+ */
 export async function deleteTaskAttachment(
   taskId: number,
   attachmentId: number,
+  remark: string,
 ): Promise<Task | null> {
   const { data } = await api.delete<{ message?: string; task?: Task }>(
     `/${portalBase()}/tasks/${taskId}/attachments/${attachmentId}`,
+    { data: { remark: remark.trim() } },
   )
   return data?.task ?? null
 }

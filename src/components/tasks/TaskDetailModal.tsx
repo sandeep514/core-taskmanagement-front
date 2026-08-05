@@ -29,6 +29,7 @@ import {
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import {
+  canDeleteTaskAttachment,
   canEditTask,
   cn,
   formatDate,
@@ -38,18 +39,19 @@ import {
   initials,
   isClientAssignedTask,
   isOverdue,
-  isTaskCreator,
 } from '@/lib/utils'
 import { getApiError } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -76,6 +78,11 @@ export function TaskDetailModal({
   const fileRef = useRef<HTMLInputElement>(null)
   const [comment, setComment] = useState('')
   const [copyOpen, setCopyOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number
+    file_name: string
+  } | null>(null)
+  const [deleteRemark, setDeleteRemark] = useState('')
 
   const { data: task, isLoading } = useQuery({
     queryKey: ['task', taskId],
@@ -84,7 +91,7 @@ export function TaskDetailModal({
   })
 
   const mayEdit = canEditTask(task, user)
-  const mayDeleteAttachment = isTaskCreator(task, user)
+  const mayDeleteAttachment = canDeleteTaskAttachment(task, user)
   const creatorLabel = task ? formatTaskCreator(task) : '—'
 
   const invalidateTaskQueries = () => {
@@ -113,12 +120,15 @@ export function TaskDetailModal({
   })
 
   const deleteAttachMutation = useMutation({
-    mutationFn: (attachmentId: number) => deleteTaskAttachment(taskId!, attachmentId),
+    mutationFn: ({ attachmentId, remark }: { attachmentId: number; remark: string }) =>
+      deleteTaskAttachment(taskId!, attachmentId, remark),
     onSuccess: (updated) => {
       if (updated) {
         qc.setQueryData(['task', taskId], updated)
       }
       invalidateTaskQueries()
+      setDeleteTarget(null)
+      setDeleteRemark('')
       toast.success('Attachment deleted')
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to delete attachment')),
@@ -437,17 +447,12 @@ export function TaskDetailModal({
                               title="Delete attachment"
                               disabled={deleteAttachMutation.isPending}
                               onClick={() => {
-                                if (
-                                  confirm(
-                                    `Delete attachment "${a.file_name}"? This cannot be undone.`,
-                                  )
-                                ) {
-                                  deleteAttachMutation.mutate(a.id)
-                                }
+                                setDeleteRemark('')
+                                setDeleteTarget({ id: a.id, file_name: a.file_name })
                               }}
                             >
                               {deleteAttachMutation.isPending &&
-                              deleteAttachMutation.variables === a.id ? (
+                              deleteAttachMutation.variables?.attachmentId === a.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -462,7 +467,7 @@ export function TaskDetailModal({
                 )}
                 {mayDeleteAttachment && (task.attachments?.length ?? 0) > 0 && (
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    As the task creator you can delete attachments.
+                    Deleting requires a reason and is recorded in the activity log.
                   </p>
                 )}
               </div>
@@ -571,6 +576,77 @@ export function TaskDetailModal({
       task={task ?? null}
       sourceProjectId={projectId}
     />
+
+    <Dialog
+      open={!!deleteTarget}
+      onOpenChange={(next) => {
+        if (!next) {
+          setDeleteTarget(null)
+          setDeleteRemark('')
+        }
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete attachment</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <p className="text-sm text-muted-foreground">
+            Soft-delete{' '}
+            <span className="font-medium text-foreground">
+              {deleteTarget?.file_name}
+            </span>
+            . A reason is required and will be saved in the activity log.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="delete-attachment-remark">
+              Reason <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              id="delete-attachment-remark"
+              value={deleteRemark}
+              onChange={(e) => setDeleteRemark(e.target.value)}
+              placeholder="Why are you removing this file?"
+              className="min-h-[96px]"
+              autoFocus
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Minimum 3 characters. The file is kept for audit and hidden from the task.
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDeleteTarget(null)
+              setDeleteRemark('')
+            }}
+            disabled={deleteAttachMutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={deleteRemark.trim().length < 3 || deleteAttachMutation.isPending}
+            onClick={() => {
+              if (!deleteTarget) return
+              deleteAttachMutation.mutate({
+                attachmentId: deleteTarget.id,
+                remark: deleteRemark.trim(),
+              })
+            }}
+          >
+            {deleteAttachMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   )
 }
