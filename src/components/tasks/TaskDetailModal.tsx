@@ -56,7 +56,11 @@ import {
   isClientAssignedTask,
   isOverdue,
 } from '@/lib/utils'
-import { getApiError } from '@/lib/api-error'
+import {
+  getApiError,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_LABEL,
+} from '@/lib/api-error'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -399,7 +403,13 @@ export function TaskDetailModal({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0]
-                        if (file) attachMutation.mutate(file)
+                        if (file) {
+                          if (file.size > MAX_ATTACHMENT_BYTES) {
+                            toast.error(`"${file.name}" exceeds the ${MAX_ATTACHMENT_LABEL} limit.`)
+                          } else {
+                            attachMutation.mutate(file)
+                          }
+                        }
                         e.target.value = ''
                       }}
                     />

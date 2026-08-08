@@ -3,7 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { addTaskAttachment, createTask, fetchProject, fetchProjectMembers, updateTask } from '@/lib/api'
-import { getApiError } from '@/lib/api-error'
+import {
+  getApiError,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_LABEL,
+} from '@/lib/api-error'
 import {
   allowedTaskStatusesForUser,
   canChangeTaskStatus,
@@ -205,9 +209,9 @@ export function TaskFormModal({
   const addFiles = (list: FileList | null) => {
     if (!list?.length) return
     const next = Array.from(list)
-    const tooBig = next.find((f) => f.size > 10 * 1024 * 1024)
+    const tooBig = next.find((f) => f.size > MAX_ATTACHMENT_BYTES)
     if (tooBig) {
-      toast.error(`"${tooBig.name}" exceeds the 10 MB limit.`)
+      toast.error(`"${tooBig.name}" exceeds the ${MAX_ATTACHMENT_LABEL} limit.`)
       return
     }
     setFiles((prev) => [...prev, ...next])
