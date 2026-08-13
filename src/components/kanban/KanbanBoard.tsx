@@ -11,7 +11,6 @@ import {
   type DragStartEvent,
   type UniqueIdentifier,
 } from '@dnd-kit/core'
-import { arrayMove } from '@dnd-kit/sortable'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Task, TaskStatus } from '@/types'
@@ -39,11 +38,23 @@ function toTaskId(id: UniqueIdentifier): number {
   return typeof id === 'number' ? id : Number(id)
 }
 
+/** Newest added / moved cards first (updated_at, then id). */
+function compareKanbanRecency(a: Task, b: Task): number {
+  const tb = Date.parse(b.updated_at) || 0
+  const ta = Date.parse(a.updated_at) || 0
+  if (tb !== ta) return tb - ta
+  return b.id - a.id
+}
+
+function sortKanbanTasks(tasks: Task[]): Task[] {
+  return [...tasks].sort(compareKanbanRecency)
+}
+
 export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps) {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
-  const [items, setItems] = useState<Task[]>(tasks)
+  const [items, setItems] = useState<Task[]>(() => sortKanbanTasks(tasks))
 
   // Keep a ref so drag handlers always read the latest board state
   const itemsRef = useRef(items)
@@ -56,7 +67,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   const isDraggingRef = useRef(false)
   useEffect(() => {
     if (!isDraggingRef.current) {
-      setItems(tasks)
+      setItems(sortKanbanTasks(tasks))
     }
   }, [tasks])
 
@@ -70,7 +81,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
       client_review: [],
       done: [],
     }
-    for (const t of items) {
+    for (const t of sortKanbanTasks(items)) {
       if (map[t.status]) map[t.status].push(t)
     }
     return map
@@ -92,7 +103,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
     },
     onError: (err) => {
       toast.error(getApiError(err, 'Failed to update task status'))
-      setItems(tasks)
+      setItems(sortKanbanTasks(tasks))
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
     },
@@ -137,22 +148,9 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
       const activeIndex = prev.findIndex((t) => t.id === activeId)
       if (activeIndex === -1) return prev
 
-      const activeItem = prev[activeIndex]
-
-      // Place near the item we're hovering (if any)
-      if (!isColumnId(over.id)) {
-        const without = prev.filter((t) => t.id !== activeId)
-        const insertAt = without.findIndex((t) => t.id === toTaskId(over.id))
-        without.splice(insertAt >= 0 ? insertAt : without.length, 0, {
-          ...activeItem,
-          status: overContainer,
-        })
-        itemsRef.current = without
-        return without
-      }
-
+      const now = new Date().toISOString()
       const next = prev.map((t) =>
-        t.id === activeId ? { ...t, status: overContainer } : t,
+        t.id === activeId ? { ...t, status: overContainer, updated_at: now } : t,
       )
       itemsRef.current = next
       return next
@@ -160,47 +158,15 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
     isDraggingRef.current = false
     setActiveTask(null)
-
-    if (!over) {
-      // Dropped outside — keep optimistic column moves from dragOver
-      commitStatusIfChanged(toTaskId(active.id))
-      return
-    }
-
-    const activeId = toTaskId(active.id)
-    const activeContainer = findContainer(active.id)
-    const overContainer = findContainer(over.id)
-
-    if (!activeContainer || !overContainer) {
-      commitStatusIfChanged(activeId)
-      return
-    }
-
-    // Reorder within the same column
-    if (activeContainer === overContainer && !isColumnId(over.id)) {
-      const overId = toTaskId(over.id)
-      setItems((prev) => {
-        const columnTasks = prev.filter((t) => t.status === activeContainer)
-        const others = prev.filter((t) => t.status !== activeContainer)
-        const oldIndex = columnTasks.findIndex((t) => t.id === activeId)
-        const newIndex = columnTasks.findIndex((t) => t.id === overId)
-        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev
-        const next = [...others, ...arrayMove(columnTasks, oldIndex, newIndex)]
-        itemsRef.current = next
-        return next
-      })
-    }
-
-    commitStatusIfChanged(activeId)
+    commitStatusIfChanged(toTaskId(event.active.id))
   }
 
   function handleDragCancel() {
     isDraggingRef.current = false
     setActiveTask(null)
-    setItems(tasks)
+    setItems(sortKanbanTasks(tasks))
   }
 
   function commitStatusIfChanged(taskId: number) {
@@ -209,7 +175,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
 
     if (original && current && original.status !== current.status) {
       if (!canMoveTask(original, current.status)) {
-        setItems(tasks)
+        setItems(sortKanbanTasks(tasks))
         toast.error(
           user?.role === 'client'
             ? 'Clients can only move tasks between Client Review and Done (unless assigned).'
@@ -221,6 +187,12 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
       toast.success(
         `Moved to ${TASK_STATUSES.find((s) => s.value === current.status)?.label}`,
       )
+      return
+    }
+
+    // Dragged back to the original column — restore server order
+    if (original && current && original.updated_at !== current.updated_at) {
+      setItems(sortKanbanTasks(tasks))
     }
   }
 

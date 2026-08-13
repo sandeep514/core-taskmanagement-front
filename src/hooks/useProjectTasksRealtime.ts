@@ -22,12 +22,19 @@ function mergeTaskIntoList(list: Task[] | undefined, payload: TaskChangedPayload
 
   const idx = list.findIndex((t) => t.id === task.id)
   if (idx === -1) {
-    return [...list, task]
+    // New cards belong at the top of the Kanban column.
+    return [task, ...list]
   }
 
-  const next = [...list]
-  next[idx] = { ...next[idx], ...task }
-  return next
+  const merged = { ...list[idx], ...task }
+  const floated = event === 'created' || event === 'status_changed'
+  if (!floated) {
+    const next = [...list]
+    next[idx] = merged
+    return next
+  }
+
+  return [merged, ...list.filter((t) => t.id !== task.id)]
 }
 
 function applyTaskChanged(
