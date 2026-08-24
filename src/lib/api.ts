@@ -134,6 +134,7 @@ function normalizeTaskPayload(payload: Partial<TaskFormData>) {
     priority: payload.priority,
     task_type: payload.task_type,
     status: payload.status,
+    is_internal: Boolean(payload.is_internal),
   }
 }
 
@@ -535,6 +536,7 @@ export async function bulkCreateTasks(
     status?: TaskStatus
     assigned_to_ids?: number[]
     assigned_to_client?: number | null
+    is_internal?: boolean
   },
 ): Promise<Task[]> {
   const { data } = await api.post<{ tasks: Task[]; count: number }>(
@@ -547,6 +549,7 @@ export async function bulkCreateTasks(
       status: payload.status ?? 'todo',
       assigned_to_ids: payload.assigned_to_ids ?? [],
       assigned_to_client: payload.assigned_to_client ?? null,
+      is_internal: Boolean(payload.is_internal),
     },
   )
   return data.tasks ?? []

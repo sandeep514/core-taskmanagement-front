@@ -1,7 +1,7 @@
 import { forwardRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Briefcase, Calendar, Clock, MessageSquare, Paperclip, UserRound } from 'lucide-react'
+import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, UserRound } from 'lucide-react'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_TYPES } from '@/types'
 import {
@@ -64,6 +64,12 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
         </div>
 
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {task.is_internal && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+              <Lock className="h-3 w-3" />
+              Internal
+            </span>
+          )}
           {clientAssigned && (
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">
               <Briefcase className="h-3 w-3" />

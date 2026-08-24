@@ -202,6 +202,8 @@ export interface Task {
   task_type: TaskType
   status: TaskStatus
   is_active?: boolean
+  /** When true, task is for internal team only and hidden from clients. */
+  is_internal?: boolean
   /** @deprecated Prefer assignees */
   assignee?: Employee | null
   assignees?: Employee[]
@@ -328,6 +330,8 @@ export interface TaskFormData {
   priority: TaskPriority
   task_type: TaskType
   status: TaskStatus
+  /** Internal team only — never shown to the client. */
+  is_internal: boolean
 }
 
 export interface PersonalTodo {

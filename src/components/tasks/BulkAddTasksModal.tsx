@@ -30,6 +30,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { useAuthStore } from '@/stores/authStore'
 
 const MAX_TITLES = 50
 
@@ -45,11 +47,14 @@ export function BulkAddTasksModal({
   projectId,
 }: BulkAddTasksModalProps) {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const canSetInternal = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'employee'
   const [text, setText] = useState('')
   const [taskType, setTaskType] = useState<TaskType>('general')
   const [priority, setPriority] = useState<TaskPriority>('medium')
   const [assignedToIds, setAssignedToIds] = useState<number[]>([])
   const [assignedToClient, setAssignedToClient] = useState<number | ''>('')
+  const [isInternal, setIsInternal] = useState(false)
 
   const { data: employees } = useQuery({
     queryKey: ['project-members', projectId],
@@ -80,6 +85,7 @@ export function BulkAddTasksModal({
     setPriority('medium')
     setAssignedToIds([])
     setAssignedToClient('')
+    setIsInternal(false)
   }, [open, projectId])
 
   // Default single project member
@@ -99,6 +105,7 @@ export function BulkAddTasksModal({
   }
 
   const assignClient = (clientId: number) => {
+    setIsInternal(false)
     setAssignedToIds([])
     setAssignedToClient((prev) => (prev === clientId ? '' : clientId))
   }
@@ -125,7 +132,9 @@ export function BulkAddTasksModal({
         task_type: taskType,
         priority,
         assigned_to_ids: assignedToIds,
-        assigned_to_client: assignedToClient === '' ? null : Number(assignedToClient),
+        assigned_to_client:
+          isInternal || assignedToClient === '' ? null : Number(assignedToClient),
+        is_internal: isInternal,
       })
     },
     onSuccess: (created) => {
@@ -228,6 +237,33 @@ export function BulkAddTasksModal({
             </div>
           </div>
 
+          {canSetInternal && (
+            <label
+              className={cn(
+                'flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/40 transition-colors',
+                isInternal && 'border-slate-400 bg-slate-50',
+              )}
+            >
+              <Checkbox
+                className="mt-0.5"
+                checked={isInternal}
+                onCheckedChange={(c) => {
+                  const next = c === true
+                  setIsInternal(next)
+                  if (next) setAssignedToClient('')
+                }}
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium leading-none">
+                  Internal (team only)
+                </span>
+                <span className="block text-xs text-muted-foreground leading-relaxed">
+                  All tasks in this batch stay hidden from the client.
+                </span>
+              </span>
+            </label>
+          )}
+
           <div className="space-y-2">
             <Label>Assignees</Label>
             <p className="text-[11px] text-muted-foreground leading-snug">
@@ -246,7 +282,7 @@ export function BulkAddTasksModal({
               >
                 Unassigned
               </button>
-              {project?.client && (
+              {project?.client && !isInternal && (
                 <button
                   type="button"
                   onClick={() => assignClient(project.client!.id)}

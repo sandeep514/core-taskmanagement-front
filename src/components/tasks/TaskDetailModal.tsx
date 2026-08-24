@@ -199,6 +199,11 @@ export function TaskDetailModal({
                   </p>
                   <DialogTitle className="text-xl leading-snug">{task.title}</DialogTitle>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {task.is_internal && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        Internal · hidden from client
+                      </span>
+                    )}
                     {clientAssigned && (
                       <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">
                         Assigned to client

@@ -21,6 +21,7 @@ import { useAuthStore } from '@/stores/authStore'
 import type { Task, TaskFormData, TaskPriority, TaskStatus, TaskType } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -59,6 +60,7 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   priority: 'medium',
   task_type: 'general',
   status,
+  is_internal: false,
 })
 
 /** When hours are set, ensure start (default today) and auto-fill end date. */
@@ -128,6 +130,7 @@ export function TaskFormModal({
         priority: task.priority,
         task_type: task.task_type ?? 'general',
         status: task.status,
+        is_internal: Boolean(task.is_internal),
       })
     } else {
       setForm(empty(defaultStatus))
@@ -154,6 +157,7 @@ export function TaskFormModal({
   const assignClient = (clientId: number) => {
     setForm((f) => ({
       ...f,
+      is_internal: false,
       assigned_to_ids: [],
       assigned_to_client: f.assigned_to_client === clientId ? '' : clientId,
     }))
@@ -167,6 +171,14 @@ export function TaskFormModal({
         : [...f.assigned_to_ids, employeeId]
       return { ...f, assigned_to_ids: next, assigned_to_client: '' }
     })
+  }
+
+  const setInternal = (value: boolean) => {
+    setForm((f) => ({
+      ...f,
+      is_internal: value,
+      ...(value ? { assigned_to_client: '' as const } : {}),
+    }))
   }
 
   const save = useMutation({
@@ -225,6 +237,7 @@ export function TaskFormModal({
   const activeEmployees = (employees ?? []).filter((e) => e.status === 'active')
   const statusLocked = Boolean(task) && !canChangeTaskStatus(task!, user)
   const fieldsLocked = Boolean(task) && !canEditTask(task, user)
+  const canSetInternal = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'employee'
   const allowedStatuses = task ? allowedTaskStatusesForUser(task, user) : null
   const statusOptions =
     allowedStatuses === null
@@ -264,6 +277,32 @@ export function TaskFormModal({
             />
           </div>
 
+          {canSetInternal && (
+            <label
+              className={cn(
+                'flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer hover:bg-muted/40 transition-colors',
+                fieldsLocked && 'opacity-60 pointer-events-none',
+                form.is_internal && 'border-slate-400 bg-slate-50',
+              )}
+            >
+              <Checkbox
+                className="mt-0.5"
+                checked={form.is_internal}
+                onCheckedChange={(c) => setInternal(c === true)}
+                disabled={fieldsLocked}
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium leading-none">
+                  Internal (team only)
+                </span>
+                <span className="block text-xs text-muted-foreground leading-relaxed">
+                  Hidden from the client portal and client notifications. Use for
+                  internal planning, QA, or team discussion.
+                </span>
+              </span>
+            </label>
+          )}
+
           {/* Details + Assignees side by side on wide screens */}
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1.5 min-w-0">
@@ -286,6 +325,7 @@ export function TaskFormModal({
               <Label>Assignees</Label>
               <p className="text-[11px] text-muted-foreground leading-snug">
                 Employees and client are exclusive. Multiple employees → one task each.
+                {form.is_internal ? ' Internal tasks cannot be assigned to the client.' : ''}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button
@@ -300,7 +340,7 @@ export function TaskFormModal({
                 >
                   Unassigned
                 </button>
-                {project?.client && (
+                {project?.client && !form.is_internal && (
                   <button
                     type="button"
                     onClick={() => assignClient(project.client!.id)}
