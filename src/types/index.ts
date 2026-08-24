@@ -68,6 +68,10 @@ export interface Employee {
   status: EntityStatus
   department?: Department | null
   designation?: Designation | null
+  /** Task activity log entries performed by this employee. */
+  activities_count?: number
+  /** Most recent task activity timestamp (ISO). */
+  last_activity_at?: string | null
   created_at: string
   updated_at: string
 }

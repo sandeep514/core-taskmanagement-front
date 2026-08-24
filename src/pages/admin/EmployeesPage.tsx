@@ -35,7 +35,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { initials } from '@/lib/utils'
+import { initials, formatDateTime } from '@/lib/utils'
 
 const empty = {
   name: '',
@@ -148,6 +148,8 @@ export function EmployeesPage() {
                   <th className="px-4 py-3 font-medium">Employee</th>
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">Department</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Designation</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell text-right">Activities</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Last activity</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
@@ -171,6 +173,14 @@ export function EmployeesPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
                       {item.designation?.designation ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell text-right tabular-nums">
+                      {item.activities_count ?? 0}
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell text-muted-foreground whitespace-nowrap">
+                      {item.last_activity_at
+                        ? formatDateTime(item.last_activity_at)
+                        : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={item.status === 'active' ? 'success' : 'muted'}>
