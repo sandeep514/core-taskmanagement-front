@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, ClipboardList, ExternalLink, Plus, Search, X } from 'lucide-react'
+import { CalendarClock, ClipboardList, ExternalLink, Plus, Search, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskStatus } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, countTopToday, isTopToday } from '@/types'
 import {
   allowedTaskStatusesForUser,
   canChangeTaskStatus,
@@ -44,6 +44,8 @@ import {
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { ExportTasksButton } from '@/components/tasks/ExportTasksDialog'
+import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
+import { TopStarButton } from '@/components/kanban/TaskCard'
 import { useProjectsTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 export function MyAssignedTasksPage() {
@@ -57,6 +59,7 @@ export function MyAssignedTasksPage() {
   const [taskTypeFilter, setTaskTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const [topOnly, setTopOnly] = useState(false)
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -130,10 +133,11 @@ export function MyAssignedTasksPage() {
       if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false
       if (taskTypeFilter !== 'all' && (task.task_type ?? 'general') !== taskTypeFilter) return false
       if (statusFilter !== 'all' && task.status !== statusFilter) return false
+      if (topOnly && !isTopToday(task)) return false
       if (!matchesTaskSearch(task, search)) return false
       return true
     })
-  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter, search])
+  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter, search, topOnly])
 
   const stats = useMemo(() => {
     const list = data ?? []
@@ -142,6 +146,7 @@ export function MyAssignedTasksPage() {
       open: list.filter((t) => t.status !== 'done').length,
       overdue: list.filter((t) => isOverdue(t.deadline, t.status)).length,
       urgent: list.filter((t) => t.priority === 'urgent' && t.status !== 'done').length,
+      topToday: countTopToday(list),
     }
   }, [data])
 
@@ -150,6 +155,7 @@ export function MyAssignedTasksPage() {
     priorityFilter !== 'all' ||
     taskTypeFilter !== 'all' ||
     statusFilter !== 'all' ||
+    topOnly ||
     Boolean(search.trim())
 
   const clearFilters = () => {
@@ -158,6 +164,7 @@ export function MyAssignedTasksPage() {
     setTaskTypeFilter('all')
     setStatusFilter('all')
     setSearch('')
+    setTopOnly(false)
   }
 
   const statusMutation = useMutation({
@@ -237,6 +244,9 @@ export function MyAssignedTasksPage() {
       />
 
       <div className="mb-5 space-y-3">
+        <div className="max-w-md">
+          <TopTasksNudge marked={stats.topToday} />
+        </div>
         <div className="relative max-w-md">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
@@ -331,6 +341,22 @@ export function MyAssignedTasksPage() {
               Clear filters
             </Button>
           )}
+          <Button
+            type="button"
+            variant={topOnly ? 'default' : 'outline'}
+            size="sm"
+            className={cn(
+              'h-9 gap-1.5',
+              topOnly
+                ? 'bg-amber-500 hover:bg-amber-600 text-white border-transparent'
+                : 'border-amber-200 text-amber-700 hover:bg-amber-50',
+            )}
+            onClick={() => setTopOnly((v) => !v)}
+            aria-pressed={topOnly}
+          >
+            <Star className="h-3.5 w-3.5" fill={topOnly ? 'currentColor' : 'none'} />
+            Top 3 ({stats.topToday})
+          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
@@ -339,6 +365,9 @@ export function MyAssignedTasksPage() {
             {hasActiveFilters ? ` of ${stats.total}` : ''} shown
           </Badge>
           <Badge variant="secondary">{stats.open} open</Badge>
+          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+            {stats.topToday} top today
+          </Badge>
           {stats.urgent > 0 && (
             <Badge className="bg-red-100 text-red-700 hover:bg-red-100">{stats.urgent} urgent</Badge>
           )}
@@ -379,6 +408,9 @@ export function MyAssignedTasksPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="w-10 px-2 py-3 font-medium" aria-label="Top task">
+                      <span className="sr-only">Top</span>
+                    </th>
                     <th className="w-16 px-4 py-3 font-medium">ID</th>
                     <th className="px-4 py-3 font-medium">Task</th>
                     <th className="px-4 py-3 font-medium">Project</th>
@@ -408,11 +440,20 @@ export function MyAssignedTasksPage() {
                         )}
                         onClick={() => openDetail(task)}
                       >
+                        <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                          <TopStarButton task={task} size="xs" />
+                        </td>
                         <td className="px-4 py-3 text-muted-foreground tabular-nums font-medium">
                           #{task.id}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-start gap-2">
+                            {isTopToday(task) && (
+                              <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                <Star className="h-3 w-3" fill="currentColor" />
+                                Top
+                              </span>
+                            )}
                             {clientAssigned && (
                               <span className="mt-0.5 shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">
                                 Client

@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ListPlus, Plus } from 'lucide-react'
 import { fetchProject, fetchProjectTasks } from '@/lib/api'
 import type { Task } from '@/types'
+import { countTopToday, isTopToday } from '@/types'
+import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +39,7 @@ export function ProjectBoardPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
   const [search, setSearch] = useState('')
+  const [topOnly, setTopOnly] = useState(false)
 
   // Live updates for all viewers on this board
   useProjectTasksRealtime(id)
@@ -67,8 +70,19 @@ export function ProjectBoardPage() {
     if (taskFilter === 'mine' && user?.id) {
       list = list.filter((t) => isTaskAssignedToUser(t, user.id, 'employee'))
     }
+    if (topOnly) {
+      list = list.filter(isTopToday)
+    }
     return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter, search)
-  }, [tasks, taskFilter, user?.id, priorityFilter, taskTypeFilter, search])
+  }, [tasks, taskFilter, user?.id, priorityFilter, taskTypeFilter, search, topOnly])
+
+  const myTasksToday = useMemo(() => {
+    const list = tasks ?? []
+    if (!user?.id) return list
+    return list.filter((t) => isTaskAssignedToUser(t, user.id, 'employee'))
+  }, [tasks, user?.id])
+  const myTopCount = countTopToday(myTasksToday)
+  const boardTopCount = countTopToday(tasks ?? [])
 
   if (loadingProjects || loadingTasks) return <PageLoader />
 
@@ -153,6 +167,9 @@ export function ProjectBoardPage() {
             onTaskTypeChange={setTaskTypeFilter}
             search={search}
             onSearchChange={setSearch}
+            topOnly={topOnly}
+            onTopOnlyChange={setTopOnly}
+            topCount={boardTopCount}
           />
           <ExportTasksButton
             tasks={filteredTasks}
@@ -168,6 +185,10 @@ export function ProjectBoardPage() {
             New Task
           </Button>
         </div>
+      </div>
+
+      <div className="mb-4 max-w-md">
+        <TopTasksNudge marked={taskFilter === 'mine' ? myTopCount : boardTopCount} compact />
       </div>
 
       <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} />

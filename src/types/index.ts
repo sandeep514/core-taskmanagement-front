@@ -175,6 +175,23 @@ export interface HrUser {
   updated_at: string
 }
 
+/** Checklist item that breaks a task into smaller steps. */
+export interface TaskSubtask {
+  id: number
+  task_id: number
+  title: string
+  is_completed: boolean
+  completed_at: string | null
+  position: number
+  created_by: number | null
+  created_by_type?: 'admin' | 'hr' | 'employee' | 'client' | null
+  completed_by: number | null
+  completed_by_type?: 'admin' | 'hr' | 'employee' | 'client' | null
+  completed_by_name?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Task {
   id: number
   project_id: number
@@ -204,6 +221,10 @@ export interface Task {
   is_active?: boolean
   /** When true, task is for internal team only and hidden from clients. */
   is_internal?: boolean
+  /** Top task of the day flag (daily — see top_task_date). */
+  is_top_task?: boolean
+  /** Date (Y-m-d) this task was marked as Top. Only today counts (daily reset). */
+  top_task_date?: string | null
   /** @deprecated Prefer assignees */
   assignee?: Employee | null
   assignees?: Employee[]
@@ -213,8 +234,13 @@ export interface Task {
   attachments?: TaskAttachment[]
   comments?: TaskComment[]
   activity_logs?: TaskActivityLog[]
+  subtasks?: TaskSubtask[]
   attachments_count?: number
   comments_count?: number
+  /** Checklist counts and completion, computed by the API. */
+  subtasks_total?: number
+  subtasks_done?: number
+  progress_percent?: number
   created_at: string
   updated_at: string
 }
@@ -296,6 +322,35 @@ export const TASK_TYPES: { value: TaskType; label: string; color: string }[] = [
   { value: 'support', label: 'Support', color: 'bg-cyan-100 text-cyan-700' },
   { value: 'enhancement', label: 'Enhancement', color: 'bg-purple-100 text-purple-700' },
 ]
+
+/** Minimum Top tasks of the day each user should mark (soft nudge, can exceed). */
+export const TOP_TASKS_DAILY_MIN = 3
+
+/** Local today in Y-m-d (matches API top_task_date). */
+export function todayKey(d = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** True when task is marked as Top for today (daily reset via top_task_date). */
+export function isTopToday(task: {
+  is_top_task?: boolean | null
+  top_task_date?: string | null
+}): boolean {
+  if (!task.is_top_task) return false
+  if (!task.top_task_date) return false
+  const raw = String(task.top_task_date).slice(0, 10)
+  return raw === todayKey()
+}
+
+/** Count of today's Top tasks in a list. */
+export function countTopToday<T extends { is_top_task?: boolean | null; top_task_date?: string | null }>(
+  tasks: T[],
+): number {
+  return tasks.filter(isTopToday).length
+}
 
 export interface LoginResponse {
   token: string

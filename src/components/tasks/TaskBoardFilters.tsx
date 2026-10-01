@@ -1,6 +1,6 @@
-import { Search, X } from 'lucide-react'
+import { Search, Star, X } from 'lucide-react'
 import type { TaskPriority, TaskType } from '@/types'
-import { TASK_PRIORITIES, TASK_TYPES } from '@/types'
+import { TASK_PRIORITIES, TASK_TYPES, isTopToday } from '@/types'
 import {
   Select,
   SelectContent,
@@ -25,6 +25,10 @@ interface TaskBoardFiltersProps {
   onSearchChange?: (value: string) => void
   searchPlaceholder?: string
   className?: string
+  /** Show only today's Top tasks */
+  topOnly?: boolean
+  onTopOnlyChange?: (value: boolean) => void
+  topCount?: number
 }
 
 export function TaskBoardFilters({
@@ -36,9 +40,12 @@ export function TaskBoardFilters({
   onSearchChange,
   searchPlaceholder = 'Search by #, title, or description…',
   className,
+  topOnly,
+  onTopOnlyChange,
+  topCount,
 }: TaskBoardFiltersProps) {
   const hasActive =
-    priority !== 'all' || taskType !== 'all' || Boolean(search?.trim())
+    priority !== 'all' || taskType !== 'all' || Boolean(search?.trim()) || Boolean(topOnly)
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
@@ -98,6 +105,25 @@ export function TaskBoardFilters({
         </SelectContent>
       </Select>
 
+      {onTopOnlyChange != null && (
+        <Button
+          type="button"
+          variant={topOnly ? 'default' : 'outline'}
+          size="sm"
+          className={cn(
+            'h-9 gap-1.5',
+            topOnly
+              ? 'bg-amber-500 hover:bg-amber-600 text-white border-transparent'
+              : 'border-amber-200 text-amber-700 hover:bg-amber-50',
+          )}
+          onClick={() => onTopOnlyChange(!topOnly)}
+          aria-pressed={Boolean(topOnly)}
+        >
+          <Star className="h-3.5 w-3.5" fill={topOnly ? 'currentColor' : 'none'} />
+          Top 3{typeof topCount === 'number' ? ` (${topCount})` : ''}
+        </Button>
+      )}
+
       {hasActive && (
         <Button
           type="button"
@@ -108,6 +134,7 @@ export function TaskBoardFilters({
             onPriorityChange('all')
             onTaskTypeChange('all')
             onSearchChange?.('')
+            onTopOnlyChange?.(false)
           }}
         >
           Clear filters
@@ -143,16 +170,18 @@ export function matchesTaskSearch(
 
 /** Client-side filter helper for kanban / list views. */
 export function filterTasksByPriorityAndType<
-  T extends { id: number; title: string; details?: string | null; priority: TaskPriority; task_type?: TaskType | null },
+  T extends { id: number; title: string; details?: string | null; priority: TaskPriority; task_type?: TaskType | null; is_top_task?: boolean | null; top_task_date?: string | null },
 >(
   tasks: T[],
   priority: PriorityFilter,
   taskType: TaskTypeFilter,
   search = '',
+  topOnly = false,
 ): T[] {
   return tasks.filter((task) => {
     if (priority !== 'all' && task.priority !== priority) return false
     if (taskType !== 'all' && (task.task_type ?? 'general') !== taskType) return false
+    if (topOnly && !isTopToday(task)) return false
     if (!matchesTaskSearch(task, search)) return false
     return true
   })

@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ListPlus, Plus } from 'lucide-react'
 import { fetchProject, fetchProjectTasks } from '@/lib/api'
 import type { Task } from '@/types'
+import { countTopToday, isTopToday } from '@/types'
+import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,11 +56,13 @@ export function ClientProjectBoardPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
   const [search, setSearch] = useState('')
+  const [topOnly, setTopOnly] = useState(false)
 
-  const filteredTasks = useMemo(
-    () => filterTasksByPriorityAndType(tasks ?? [], priorityFilter, taskTypeFilter, search),
-    [tasks, priorityFilter, taskTypeFilter, search],
-  )
+  const filteredTasks = useMemo(() => {
+    const list = (tasks ?? []).filter((t) => (topOnly ? isTopToday(t) : true))
+    return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter, search)
+  }, [tasks, priorityFilter, taskTypeFilter, search, topOnly])
+  const boardTopCount = countTopToday(tasks ?? [])
 
   if (loadingProject) return <PageLoader />
 
@@ -141,6 +145,9 @@ export function ClientProjectBoardPage() {
             onTaskTypeChange={setTaskTypeFilter}
             search={search}
             onSearchChange={setSearch}
+            topOnly={topOnly}
+            onTopOnlyChange={setTopOnly}
+            topCount={boardTopCount}
           />
           {canAdd && (
             <>
@@ -155,6 +162,10 @@ export function ClientProjectBoardPage() {
             </>
           )}
         </div>
+      </div>
+
+      <div className="mb-4 max-w-md">
+        <TopTasksNudge marked={boardTopCount} compact />
       </div>
 
       <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} />

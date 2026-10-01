@@ -16,6 +16,7 @@ import {
   Pencil,
   Send,
   Power,
+  Star,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -27,9 +28,10 @@ import {
   deactivateTask,
   deleteTaskAttachment,
   fetchTask,
+  toggleTaskTop,
 } from '@/lib/api'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, isTopToday } from '@/types'
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i
 
@@ -77,6 +79,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageLoader } from '@/components/ui/loading'
 import { CopyTaskDialog } from '@/components/tasks/CopyTaskDialog'
+import { TaskSubtaskList } from '@/components/tasks/TaskSubtaskList'
 
 interface TaskDetailModalProps {
   open: boolean
@@ -170,6 +173,20 @@ export function TaskDetailModal({
     onError: (err) => toast.error(getApiError(err, 'Failed to deactivate task')),
   })
 
+  const topMutation = useMutation({
+    mutationFn: () => toggleTaskTop(taskId!),
+    onSuccess: (updated) => {
+      qc.setQueryData(['task', taskId], updated)
+      invalidateTaskQueries()
+      toast.success(
+        isTopToday(updated) ? 'Marked as Top task for today' : 'Removed from Top tasks',
+      )
+    },
+    onError: (err) => toast.error(getApiError(err, 'Could not update Top task')),
+  })
+
+  const topToday = task ? isTopToday(task) : false
+
   const priority = TASK_PRIORITIES.find((p) => p.value === task?.priority)
   const status = TASK_STATUSES.find((s) => s.value === task?.status)
   const taskType = TASK_TYPES.find((t) => t.value === (task?.task_type ?? 'general'))
@@ -199,6 +216,12 @@ export function TaskDetailModal({
                   </p>
                   <DialogTitle className="text-xl leading-snug">{task.title}</DialogTitle>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    {topToday && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        <Star className="h-3 w-3" fill="currentColor" />
+                        Top task for today
+                      </span>
+                    )}
                     {task.is_internal && (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                         Internal · hidden from client
@@ -258,6 +281,19 @@ export function TaskDetailModal({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1 shrink-0 justify-end">
+                  <Button
+                    variant={topToday ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => topMutation.mutate()}
+                    disabled={topMutation.isPending}
+                    className={cn(
+                      topToday && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent',
+                    )}
+                    title={topToday ? 'Remove from Top tasks for today' : 'Mark as Top task for today'}
+                  >
+                    <Star className="h-3.5 w-3.5" fill={topToday ? 'currentColor' : 'none'} />
+                    {topToday ? 'Top task' : 'Mark Top 3'}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -390,6 +426,15 @@ export function TaskDetailModal({
                   </div>
                 </div>
               </div>
+
+              <Separator />
+
+              <TaskSubtaskList
+                task={task}
+                projectId={projectId}
+                canManage={mayEdit}
+                canComplete={Boolean(user)}
+              />
 
               <Separator />
 

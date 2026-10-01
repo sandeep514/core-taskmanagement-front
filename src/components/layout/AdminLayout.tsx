@@ -15,6 +15,7 @@ import {
   Users,
   UserCog,
   BadgeCheck,
+  Star,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -34,6 +35,7 @@ const nav = [
   { to: '/admin/employees', label: 'Employees', icon: Users },
   { to: '/admin/hrs', label: 'HR Accounts', icon: UserCog },
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
+  { to: '/admin/top-tasks', label: 'Top Tasks', icon: Star },
   { to: '/admin/activity-logs', label: 'Activity Logs', icon: Activity },
   { to: '/admin/work-report', label: 'Work Report', icon: BarChart3 },
   { to: '/admin/settings', label: 'Settings', icon: Settings },

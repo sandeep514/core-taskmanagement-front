@@ -15,6 +15,7 @@ import type {
   Task,
   TaskFormData,
   TaskPriority,
+  TaskSubtask,
   TaskStatus,
   TaskType,
   TodoFilter,
@@ -598,6 +599,37 @@ export async function updateTaskStatus(taskId: number, status: TaskStatus): Prom
   return data
 }
 
+/** Mark / unmark a task as Top task for today. Pass explicit value or omit to toggle. */
+export async function toggleTaskTop(taskId: number, is_top_task?: boolean): Promise<Task> {
+  const { data } = await api.patch<Task>(
+    `/${portalBase()}/tasks/${taskId}/top`,
+    is_top_task === undefined ? {} : { is_top_task },
+  )
+  return data
+}
+
+export interface TopTasksReportResponse {
+  date: string
+  count: number
+  data: Task[]
+}
+
+/** Admin/HR report: all tasks marked as Top for a date (default today). */
+export async function fetchTopTasksReport(params: {
+  date?: string
+  employee_id?: number | null
+  project_id?: number | null
+}): Promise<TopTasksReportResponse> {
+  const { data } = await api.get<TopTasksReportResponse>(`/${portalBase()}/top-tasks`, {
+    params: {
+      ...(params.date ? { date: params.date } : {}),
+      ...(params.employee_id ? { employee_id: params.employee_id } : {}),
+      ...(params.project_id ? { project_id: params.project_id } : {}),
+    },
+  })
+  return data
+}
+
 /** Soft-deactivate task (hidden from Kanban). */
 export async function deactivateTask(taskId: number): Promise<Task> {
   const { data } = await api.delete<Task>(`/${portalBase()}/tasks/${taskId}`)
@@ -611,6 +643,64 @@ export async function activateTask(taskId: number): Promise<Task> {
 
 export async function addTaskComment(taskId: number, comment: string): Promise<void> {
   await api.post(`/${portalBase()}/tasks/${taskId}/comments`, { comment })
+}
+
+// ─── Task subtasks (checklist) ──────────────────────────────────────────────
+
+/** Add one subtask, or several at once by passing multiple titles. */
+export async function addTaskSubtasks(
+  taskId: number,
+  titles: string[],
+): Promise<Task> {
+  const { data } = await api.post<{ subtasks: TaskSubtask[]; task: Task }>(
+    `/${portalBase()}/tasks/${taskId}/subtasks`,
+    titles.length === 1 ? { title: titles[0] } : { titles },
+  )
+  return data.task
+}
+
+export async function updateTaskSubtask(
+  taskId: number,
+  subtaskId: number,
+  payload: { title?: string; is_completed?: boolean },
+): Promise<Task> {
+  const { data } = await api.put<{ subtask: TaskSubtask; task: Task }>(
+    `/${portalBase()}/tasks/${taskId}/subtasks/${subtaskId}`,
+    payload,
+  )
+  return data.task
+}
+
+export async function toggleTaskSubtask(
+  taskId: number,
+  subtaskId: number,
+): Promise<Task> {
+  const { data } = await api.patch<{ subtask: TaskSubtask; task: Task }>(
+    `/${portalBase()}/tasks/${taskId}/subtasks/${subtaskId}/toggle`,
+  )
+  return data.task
+}
+
+export async function deleteTaskSubtask(
+  taskId: number,
+  subtaskId: number,
+): Promise<Task> {
+  const { data } = await api.delete<{ task: Task }>(
+    `/${portalBase()}/tasks/${taskId}/subtasks/${subtaskId}`,
+  )
+  return data.task
+}
+
+/** Persist checklist order from an ordered list of subtask ids. */
+export async function reorderTaskSubtasks(
+  taskId: number,
+  ids: number[],
+): Promise<Task> {
+  const { data } = await api.post<{ task: Task }>(
+    `/${portalBase()}/tasks/${taskId}/subtasks/reorder`,
+    { ids },
+  )
+  return data.task
 }
 
 export async function addTaskAttachment(taskId: number, file: File): Promise<void> {
