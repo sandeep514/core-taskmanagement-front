@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ListPlus, Plus } from 'lucide-react'
-import { fetchProject, fetchProjectTasks } from '@/lib/api'
+import { fetchMyAssignedTasks, fetchProject, fetchProjectTasks } from '@/lib/api'
 import type { Task } from '@/types'
 import { countTopToday, isTopToday } from '@/types'
 import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
@@ -63,6 +63,14 @@ export function ClientProjectBoardPage() {
     return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter, search)
   }, [tasks, priorityFilter, taskTypeFilter, search, topOnly])
   const boardTopCount = countTopToday(tasks ?? [])
+
+  // Global total across all projects — the Top-3 min applies to this.
+  const { data: myAssignedAll } = useQuery({
+    queryKey: ['my-assigned-tasks'],
+    queryFn: fetchMyAssignedTasks,
+  })
+  const globalMyTopCount = countTopToday(myAssignedAll ?? [])
+  const myTopInProject = countTopToday((myAssignedAll ?? []).filter((t) => t.project_id === id))
 
   if (loadingProject) return <PageLoader />
 
@@ -165,7 +173,7 @@ export function ClientProjectBoardPage() {
       </div>
 
       <div className="mb-4 max-w-md">
-        <TopTasksNudge marked={boardTopCount} compact />
+        <TopTasksNudge marked={globalMyTopCount} projectMarked={myTopInProject} compact />
       </div>
 
       <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} />

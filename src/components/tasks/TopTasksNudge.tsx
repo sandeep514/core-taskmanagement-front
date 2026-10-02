@@ -3,13 +3,16 @@ import { TOP_TASKS_DAILY_MIN } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface TopTasksNudgeProps {
+  /** Global total across all projects (assigned to me). This is what the min applies to. */
   marked: number
   min?: number
   className?: string
   compact?: boolean
+  /** Optional per-project count to show as context, e.g. 1 in this project of 3 total. */
+  projectMarked?: number
 }
 
-export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, compact = false }: TopTasksNudgeProps) {
+export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, compact = false, projectMarked }: TopTasksNudgeProps) {
   const done = marked >= min
   const pct = Math.min(100, Math.round((marked / min) * 100))
 
@@ -45,6 +48,11 @@ export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, co
             </span>
           )}
         </p>
+        {projectMarked !== undefined && projectMarked !== marked && (
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {projectMarked} in this project · {marked} total across all projects
+          </p>
+        )}
         {!compact && (
           <>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/80">
@@ -59,9 +67,15 @@ export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, co
             {!done && (
               <p className="mt-1 text-xs text-amber-800/80">
                 Star your most important tasks so the day stays focused. You can mark more than {min}.
+                Total counts across all projects.
               </p>
             )}
           </>
+        )}
+        {compact && projectMarked !== undefined && projectMarked !== marked && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Total counts across all projects.
+          </p>
         )}
       </div>
     </div>
