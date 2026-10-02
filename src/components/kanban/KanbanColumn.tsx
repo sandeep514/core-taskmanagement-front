@@ -1,8 +1,20 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { ArrowUpDown, Check } from 'lucide-react'
 import type { Task, TaskStatus } from '@/types'
 import { TASK_STATUSES } from '@/types'
 import { cn } from '@/lib/utils'
+import {
+  KANBAN_SORT_OPTIONS,
+  kanbanSortShortLabel,
+  type KanbanSort,
+} from '@/components/tasks/TaskBoardFilters'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { TaskCard } from './TaskCard'
 
 interface KanbanColumnProps {
@@ -10,9 +22,19 @@ interface KanbanColumnProps {
   tasks: Task[]
   onTaskClick: (task: Task) => void
   canMoveTask?: (task: Task) => boolean
+  /** Effective sort for this column (resolved by the board). */
+  sort?: KanbanSort
+  onSortChange?: (status: TaskStatus, sort: KanbanSort) => void
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick, canMoveTask }: KanbanColumnProps) {
+export function KanbanColumn({
+  status,
+  tasks,
+  onTaskClick,
+  canMoveTask,
+  sort = 'auto',
+  onSortChange,
+}: KanbanColumnProps) {
   const meta = TASK_STATUSES.find((s) => s.value === status)!
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -28,12 +50,41 @@ export function KanbanColumn({ status, tasks, onTaskClick, canMoveTask }: Kanban
         isOver && 'ring-2 ring-primary/40 bg-accent/40',
       )}
     >
-      <div className="flex items-center justify-between px-3 py-3 border-b border-border/60">
-        <span className={cn('rounded-md border px-2 py-0.5 text-xs font-semibold', meta.color)}>
+      <div className="flex items-center justify-between gap-1.5 px-3 py-2.5 border-b border-border/60">
+        <span className={cn('rounded-md border px-2 py-0.5 text-xs font-semibold truncate', meta.color)}>
           {meta.label}
         </span>
-        <span className="text-xs font-medium text-muted-foreground bg-card rounded-full h-6 min-w-6 px-1.5 flex items-center justify-center border border-border">
-          {tasks.length}
+        <span className="flex items-center gap-1 shrink-0">
+          <span className="text-xs font-medium text-muted-foreground bg-card rounded-full h-6 min-w-6 px-1.5 flex items-center justify-center border border-border">
+            {tasks.length}
+          </span>
+          {onSortChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  title={`Sort ${meta.label} column (now: ${kanbanSortShortLabel(sort, status)})`}
+                  aria-label={`Sort ${meta.label} column`}
+                  className="flex h-6 items-center gap-0.5 rounded-md border border-border bg-card px-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <ArrowUpDown className="h-3 w-3" />
+                  {kanbanSortShortLabel(sort, status)}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                {KANBAN_SORT_OPTIONS.map((o) => (
+                  <DropdownMenuItem
+                    key={o.value}
+                    onClick={() => onSortChange(status, o.value)}
+                    className="justify-between"
+                  >
+                    <span>{o.label}</span>
+                    {sort === o.value && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </span>
       </div>
 

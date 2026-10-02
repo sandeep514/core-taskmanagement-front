@@ -28,6 +28,21 @@ export const KANBAN_SORT_OPTIONS: { value: KanbanSort; label: string }[] = [
 /** Default card order: To Do by ID ascending, every other column by ID descending. */
 export const DEFAULT_KANBAN_SORT: KanbanSort = 'auto'
 
+export type KanbanColumnSorts = Partial<Record<string, KanbanSort>>
+
+/** Effective sort for one column: explicit override or the Auto rule. */
+export function resolveColumnSort(status: string, overrides?: KanbanColumnSorts): KanbanSort {
+  return overrides?.[status] ?? DEFAULT_KANBAN_SORT
+}
+
+/** Short label for the column header sort button. */
+export function kanbanSortShortLabel(sort: KanbanSort, status: string): string {
+  const effective = sort === 'auto' ? (status === 'todo' ? 'id-asc' : 'id-desc') : sort
+  if (effective === 'id-asc') return 'ID ↑'
+  if (effective === 'id-desc') return 'ID ↓'
+  return 'Recent'
+}
+
 /** Order tasks for kanban columns. `recent` = last added / moved first. */
 export function sortTasksForKanban<
   T extends { id: number; updated_at?: string },
@@ -48,6 +63,7 @@ export function sortTasksForKanban<
 }
 
 const KANBAN_SORT_KEY = 'taskflow-kanban-sort'
+const KANBAN_COLUMN_SORTS_KEY = 'taskflow-kanban-column-sorts'
 
 export function loadKanbanSort(): KanbanSort {
   try {
@@ -67,6 +83,36 @@ export function saveKanbanSort(sort: KanbanSort) {
   }
 }
 
+/** Load per-column sort overrides (only non-Auto choices are stored). */
+export function loadKanbanColumnSorts(): KanbanColumnSorts {
+  try {
+    const raw = localStorage.getItem(KANBAN_COLUMN_SORTS_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const valid: KanbanColumnSorts = {}
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v === 'recent' || v === 'id-asc' || v === 'id-desc' || v === 'auto') {
+        valid[k] = v
+      }
+    }
+    return valid
+  } catch {
+    return {}
+  }
+}
+
+export function saveKanbanColumnSorts(sorts: KanbanColumnSorts) {
+  try {
+    const compact: Record<string, KanbanSort> = {}
+    for (const [k, v] of Object.entries(sorts)) {
+      if (v && v !== 'auto') compact[k] = v
+    }
+    localStorage.setItem(KANBAN_COLUMN_SORTS_KEY, JSON.stringify(compact))
+  } catch {
+    // ignore
+  }
+}
+
 interface TaskBoardFiltersProps {
   priority: PriorityFilter
   taskType: TaskTypeFilter
@@ -81,9 +127,6 @@ interface TaskBoardFiltersProps {
   topOnly?: boolean
   onTopOnlyChange?: (value: boolean) => void
   topCount?: number
-  /** Card order inside kanban columns (shows a Sort select when wired) */
-  sort?: KanbanSort
-  onSortChange?: (value: KanbanSort) => void
 }
 
 export function TaskBoardFilters({
@@ -98,15 +141,12 @@ export function TaskBoardFilters({
   topOnly,
   onTopOnlyChange,
   topCount,
-  sort,
-  onSortChange,
 }: TaskBoardFiltersProps) {
   const hasActive =
     priority !== 'all' ||
     taskType !== 'all' ||
     Boolean(search?.trim()) ||
-    Boolean(topOnly) ||
-    (sort != null && sort !== DEFAULT_KANBAN_SORT)
+    Boolean(topOnly)
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
@@ -166,24 +206,6 @@ export function TaskBoardFilters({
         </SelectContent>
       </Select>
 
-      {onSortChange != null && (
-        <Select
-          value={sort ?? DEFAULT_KANBAN_SORT}
-          onValueChange={(v) => onSortChange(v as KanbanSort)}
-        >
-          <SelectTrigger className="w-[150px] h-9 bg-background" aria-label="Sort cards">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            {KANBAN_SORT_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
       {onTopOnlyChange != null && (
         <Button
           type="button"
@@ -214,7 +236,6 @@ export function TaskBoardFilters({
             onTaskTypeChange('all')
             onSearchChange?.('')
             onTopOnlyChange?.(false)
-            onSortChange?.(DEFAULT_KANBAN_SORT)
           }}
         >
           Clear filters

@@ -16,9 +16,6 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import {
   TaskBoardFilters,
   filterTasksByPriorityAndType,
-  loadKanbanSort,
-  saveKanbanSort,
-  type KanbanSort,
   type PriorityFilter,
   type TaskTypeFilter,
 } from '@/components/tasks/TaskBoardFilters'
@@ -43,12 +40,6 @@ export function ProjectBoardPage() {
   const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all')
   const [search, setSearch] = useState('')
   const [topOnly, setTopOnly] = useState(false)
-  const [sort, setSort] = useState<KanbanSort>(() => loadKanbanSort())
-
-  const handleSortChange = (value: KanbanSort) => {
-    setSort(value)
-    saveKanbanSort(value)
-  }
 
   // Live updates for all viewers on this board
   useProjectTasksRealtime(id)
@@ -179,8 +170,6 @@ export function ProjectBoardPage() {
             topOnly={topOnly}
             onTopOnlyChange={setTopOnly}
             topCount={boardTopCount}
-            sort={sort}
-            onSortChange={handleSortChange}
           />
           <ExportTasksButton
             tasks={filteredTasks}
@@ -202,7 +191,7 @@ export function ProjectBoardPage() {
         <TopTasksNudge marked={taskFilter === 'mine' ? myTopCount : boardTopCount} compact />
       </div>
 
-      <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} sort={sort} />
+      <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} />
 
       <TaskFormModal
         open={formOpen}
