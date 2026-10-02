@@ -209,13 +209,64 @@ export function TaskDetailModal({
                 clientAssigned && 'bg-violet-50 border-b border-violet-100',
               )}
             >
-              <div className="flex items-start justify-between gap-4 pr-6">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold tabular-nums text-muted-foreground mb-1">
+              <div className="flex flex-col gap-3 pr-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold tabular-nums text-muted-foreground">
                     Task #{task.id}
                   </p>
-                  <DialogTitle className="text-xl leading-snug">{task.title}</DialogTitle>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    <Button
+                      variant={topToday ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => topMutation.mutate()}
+                      disabled={topMutation.isPending}
+                      className={cn(
+                        topToday && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent',
+                      )}
+                      title={topToday ? 'Remove from Top tasks for today' : 'Mark as Top task for today'}
+                    >
+                      <Star className="h-3.5 w-3.5" fill={topToday ? 'currentColor' : 'none'} />
+                      {topToday ? 'Top task' : 'Mark Top 3'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCopyOpen(true)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy
+                    </Button>
+                    {mayEdit ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          onEdit(task)
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    ) : null}
+                    {mayEdit ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-amber-700 hover:text-amber-800"
+                        onClick={() => {
+                          if (confirm('Deactivate this task? It will be hidden from the board.')) {
+                            deactivateMutation.mutate()
+                          }
+                        }}
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                        Deactivate
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                <DialogTitle className="text-xl leading-snug break-words">{task.title}</DialogTitle>
+                  <div className="flex flex-wrap gap-2">
                     {topToday && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
                         <Star className="h-3 w-3" fill="currentColor" />
@@ -279,57 +330,6 @@ export function TaskDetailModal({
                       </span>
                     )}
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-1 shrink-0 justify-end">
-                  <Button
-                    variant={topToday ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => topMutation.mutate()}
-                    disabled={topMutation.isPending}
-                    className={cn(
-                      topToday && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent',
-                    )}
-                    title={topToday ? 'Remove from Top tasks for today' : 'Mark as Top task for today'}
-                  >
-                    <Star className="h-3.5 w-3.5" fill={topToday ? 'currentColor' : 'none'} />
-                    {topToday ? 'Top task' : 'Mark Top 3'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCopyOpen(true)}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Copy
-                  </Button>
-                  {mayEdit ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        onEdit(task)
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                  ) : null}
-                  {mayEdit ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-amber-700 hover:text-amber-800"
-                      onClick={() => {
-                        if (confirm('Deactivate this task? It will be hidden from the board.')) {
-                          deactivateMutation.mutate()
-                        }
-                      }}
-                    >
-                      <Power className="h-3.5 w-3.5" />
-                      Deactivate
-                    </Button>
-                  ) : null}
-                </div>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 {mayEdit ? (

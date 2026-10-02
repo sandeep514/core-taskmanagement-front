@@ -112,11 +112,11 @@ export function KanbanColumn({
         className="kanban-column-scroll scrollbar-thin flex flex-col gap-2.5 p-2.5 min-h-[160px]"
       >
         <SortableContext id={status} items={itemIds} strategy={verticalListSortingStrategy}>
-          {tasks.map((task) => (
-            <div key={task.id} className="relative">
-              {status === 'todo' && onToggleSelect && (
+          {tasks.map((task) =>
+            status === 'todo' && onToggleSelect ? (
+              <div key={task.id} className="flex items-start gap-2">
                 <span
-                  className="absolute left-2 top-2 z-10 rounded bg-card/90 p-0.5 shadow-sm"
+                  className="shrink-0 rounded bg-card/90 p-1 shadow-sm mt-2.5"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -127,14 +127,23 @@ export function KanbanColumn({
                     title="Select for bulk deactivate (To Do only)"
                   />
                 </span>
-              )}
+                <div className="flex-1 min-w-0">
+                  <TaskCard
+                    task={task}
+                    onClick={() => onTaskClick(task)}
+                    dragDisabled={canMoveTask ? !canMoveTask(task) : false}
+                  />
+                </div>
+              </div>
+            ) : (
               <TaskCard
+                key={task.id}
                 task={task}
                 onClick={() => onTaskClick(task)}
                 dragDisabled={canMoveTask ? !canMoveTask(task) : false}
               />
-            </div>
-          ))}
+            ),
+          )}
         </SortableContext>
 
         {tasks.length === 0 && (
