@@ -15,6 +15,58 @@ import { cn } from '@/lib/utils'
 export type PriorityFilter = 'all' | TaskPriority
 export type TaskTypeFilter = 'all' | TaskType
 
+/** Card order inside kanban columns. */
+export type KanbanSort = 'auto' | 'recent' | 'id-asc' | 'id-desc'
+
+export const KANBAN_SORT_OPTIONS: { value: KanbanSort; label: string }[] = [
+  { value: 'auto', label: 'Auto (To Do ↑, others ↓)' },
+  { value: 'id-asc', label: 'ID ascending' },
+  { value: 'id-desc', label: 'ID descending' },
+  { value: 'recent', label: 'Recent first' },
+]
+
+/** Default card order: To Do by ID ascending, every other column by ID descending. */
+export const DEFAULT_KANBAN_SORT: KanbanSort = 'auto'
+
+/** Order tasks for kanban columns. `recent` = last added / moved first. */
+export function sortTasksForKanban<
+  T extends { id: number; updated_at?: string },
+>(tasks: T[], sort: KanbanSort = DEFAULT_KANBAN_SORT): T[] {
+  const list = [...tasks]
+  if (sort === 'id-asc' || sort === 'auto') {
+    return list.sort((a, b) => a.id - b.id)
+  }
+  if (sort === 'id-desc') {
+    return list.sort((a, b) => b.id - a.id)
+  }
+  return list.sort((a, b) => {
+    const db = Date.parse(b.updated_at ?? '') || 0
+    const da = Date.parse(a.updated_at ?? '') || 0
+    if (db !== da) return db - da
+    return b.id - a.id
+  })
+}
+
+const KANBAN_SORT_KEY = 'taskflow-kanban-sort'
+
+export function loadKanbanSort(): KanbanSort {
+  try {
+    const raw = localStorage.getItem(KANBAN_SORT_KEY)
+    if (raw === 'auto' || raw === 'recent' || raw === 'id-asc' || raw === 'id-desc') return raw
+  } catch {
+    // ignore (private mode etc.)
+  }
+  return DEFAULT_KANBAN_SORT
+}
+
+export function saveKanbanSort(sort: KanbanSort) {
+  try {
+    localStorage.setItem(KANBAN_SORT_KEY, sort)
+  } catch {
+    // ignore
+  }
+}
+
 interface TaskBoardFiltersProps {
   priority: PriorityFilter
   taskType: TaskTypeFilter
@@ -29,6 +81,9 @@ interface TaskBoardFiltersProps {
   topOnly?: boolean
   onTopOnlyChange?: (value: boolean) => void
   topCount?: number
+  /** Card order inside kanban columns (shows a Sort select when wired) */
+  sort?: KanbanSort
+  onSortChange?: (value: KanbanSort) => void
 }
 
 export function TaskBoardFilters({
@@ -43,9 +98,15 @@ export function TaskBoardFilters({
   topOnly,
   onTopOnlyChange,
   topCount,
+  sort,
+  onSortChange,
 }: TaskBoardFiltersProps) {
   const hasActive =
-    priority !== 'all' || taskType !== 'all' || Boolean(search?.trim()) || Boolean(topOnly)
+    priority !== 'all' ||
+    taskType !== 'all' ||
+    Boolean(search?.trim()) ||
+    Boolean(topOnly) ||
+    (sort != null && sort !== DEFAULT_KANBAN_SORT)
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
@@ -105,6 +166,24 @@ export function TaskBoardFilters({
         </SelectContent>
       </Select>
 
+      {onSortChange != null && (
+        <Select
+          value={sort ?? DEFAULT_KANBAN_SORT}
+          onValueChange={(v) => onSortChange(v as KanbanSort)}
+        >
+          <SelectTrigger className="w-[150px] h-9 bg-background" aria-label="Sort cards">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            {KANBAN_SORT_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
       {onTopOnlyChange != null && (
         <Button
           type="button"
@@ -135,6 +214,7 @@ export function TaskBoardFilters({
             onTaskTypeChange('all')
             onSearchChange?.('')
             onTopOnlyChange?.(false)
+            onSortChange?.(DEFAULT_KANBAN_SORT)
           }}
         >
           Clear filters

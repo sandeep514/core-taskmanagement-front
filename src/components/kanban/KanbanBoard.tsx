@@ -21,11 +21,18 @@ import { canChangeTaskStatus } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardContent } from './TaskCard'
+import {
+  DEFAULT_KANBAN_SORT,
+  sortTasksForKanban,
+  type KanbanSort,
+} from '@/components/tasks/TaskBoardFilters'
 
 interface KanbanBoardProps {
   projectId: number
   tasks: Task[]
   onTaskClick: (task: Task) => void
+  /** Card order inside columns. Defaults to ID ascending. */
+  sort?: KanbanSort
 }
 
 const COLUMN_IDS = new Set(TASK_STATUSES.map((s) => s.value))
@@ -46,15 +53,27 @@ function compareKanbanRecency(a: Task, b: Task): number {
   return b.id - a.id
 }
 
-function sortKanbanTasks(tasks: Task[]): Task[] {
-  return [...tasks].sort(compareKanbanRecency)
+function sortKanbanTasks(tasks: Task[], sort: KanbanSort = DEFAULT_KANBAN_SORT): Task[] {
+  if (sort === 'recent') return [...tasks].sort(compareKanbanRecency)
+  return sortTasksForKanban(tasks, sort)
 }
 
-export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps) {
+/**
+ * Default (`auto`) order: To Do by ID ascending (oldest first),
+ * every other column by ID descending (newest first).
+ */
+function sortColumnTasks(tasks: Task[], status: TaskStatus, sort: KanbanSort): Task[] {
+  if (sort !== 'auto') return sortKanbanTasks(tasks, sort)
+  const list = [...tasks]
+  if (status === 'todo') return list.sort((a, b) => a.id - b.id)
+  return list.sort((a, b) => b.id - a.id)
+}
+
+export function KanbanBoard({ projectId, tasks, onTaskClick, sort = DEFAULT_KANBAN_SORT }: KanbanBoardProps) {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
-  const [items, setItems] = useState<Task[]>(() => sortKanbanTasks(tasks))
+  const [items, setItems] = useState<Task[]>(() => sortKanbanTasks(tasks, sort))
 
   // Keep a ref so drag handlers always read the latest board state
   const itemsRef = useRef(items)
@@ -67,9 +86,9 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   const isDraggingRef = useRef(false)
   useEffect(() => {
     if (!isDraggingRef.current) {
-      setItems(sortKanbanTasks(tasks))
+      setItems(sortKanbanTasks(tasks, sort))
     }
-  }, [tasks])
+  }, [tasks, sort])
 
   const columns = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = {
@@ -81,11 +100,14 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
       client_review: [],
       done: [],
     }
-    for (const t of sortKanbanTasks(items)) {
+    for (const t of items) {
       if (map[t.status]) map[t.status].push(t)
     }
+    for (const status of Object.keys(map) as TaskStatus[]) {
+      map[status] = sortColumnTasks(map[status], status, sort)
+    }
     return map
-  }, [items])
+  }, [items, sort])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -103,7 +125,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
     },
     onError: (err) => {
       toast.error(getApiError(err, 'Failed to update task status'))
-      setItems(sortKanbanTasks(tasks))
+      setItems(sortKanbanTasks(tasks, sort))
       qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
     },
@@ -166,7 +188,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   function handleDragCancel() {
     isDraggingRef.current = false
     setActiveTask(null)
-    setItems(sortKanbanTasks(tasks))
+    setItems(sortKanbanTasks(tasks, sort))
   }
 
   function commitStatusIfChanged(taskId: number) {
@@ -175,7 +197,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
 
     if (original && current && original.status !== current.status) {
       if (!canMoveTask(original, current.status)) {
-        setItems(sortKanbanTasks(tasks))
+        setItems(sortKanbanTasks(tasks, sort))
         toast.error(
           user?.role === 'client'
             ? 'Clients can only move tasks between Client Review and Done (unless assigned).'
@@ -192,7 +214,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
 
     // Dragged back to the original column — restore server order
     if (original && current && original.updated_at !== current.updated_at) {
-      setItems(sortKanbanTasks(tasks))
+      setItems(sortKanbanTasks(tasks, sort))
     }
   }
 
