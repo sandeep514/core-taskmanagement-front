@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, ClipboardList, ExternalLink, Plus, Search, Star, X } from 'lucide-react'
+import { CalendarClock, ClipboardList, ExternalLink, Plus, Power, Search, Star, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
+import { bulkDeactivateTasks, fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskStatus } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, countTopToday, isTopToday } from '@/types'
@@ -46,6 +46,7 @@ import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { ExportTasksButton } from '@/components/tasks/ExportTasksDialog'
 import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
 import { TopStarButton } from '@/components/kanban/TaskCard'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useProjectsTasksRealtime } from '@/hooks/useProjectTasksRealtime'
 
 export function MyAssignedTasksPage() {
@@ -175,6 +176,61 @@ export function MyAssignedTasksPage() {
       toast.success('Status updated')
     },
     onError: (err) => toast.error(getApiError(err, 'Failed to update status')),
+  })
+
+  // ── Bulk deactivate (todo-only, checkbox selection) ──────────────────────
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
+
+  /** Only To Do tasks can be bulk-deactivated (backend enforces this too). */
+  const selectableFiltered = useMemo(
+    () => filtered.filter((t) => t.status === 'todo'),
+    [filtered],
+  )
+  const selectableIds = useMemo(() => selectableFiltered.map((t) => t.id), [selectableFiltered])
+  const allSelectableChecked =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id))
+
+  // Prune selection when the list changes (filter / refetch / deactivate).
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => selectableIds.includes(id)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectableIds.join(',')])
+
+  const toggleOne = (taskId: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId],
+    )
+  }
+
+  const toggleAllSelectable = () => {
+    setSelectedIds((prev) =>
+      selectableIds.every((id) => prev.includes(id)) ? [] : [...selectableIds],
+    )
+  }
+
+  const bulkDeactivateMutation = useMutation({
+    mutationFn: (ids: number[]) => bulkDeactivateTasks(ids),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+      qc.invalidateQueries({ queryKey: ['project-tasks'] })
+      setSelectedIds([])
+      setBulkConfirmOpen(false)
+      if (res.count > 0) {
+        toast.success(
+          res.skipped.length > 0
+            ? `Deactivated ${res.count} task${res.count === 1 ? '' : 's'} (${res.skipped.length} skipped)`
+            : `Deactivated ${res.count} task${res.count === 1 ? '' : 's'}`,
+        )
+      } else if (res.skipped.length > 0) {
+        toast.error(res.skipped[0]?.reason ?? 'Nothing deactivated.')
+      }
+      if (res.skipped.length > 0 && res.count > 0) {
+        const reasons = res.skipped.slice(0, 3).map((s) => `#${s.id}: ${s.reason}`).join('; ')
+        if (reasons) toast.info(`Skipped — ${reasons}`)
+      }
+    },
+    onError: (err) => toast.error(getApiError(err, 'Failed to deactivate tasks')),
   })
 
   const openDetail = (task: Task) => {
@@ -377,6 +433,38 @@ export function MyAssignedTasksPage() {
             </Badge>
           )}
         </div>
+
+        {/* Bulk deactivate bar — todo-only selection */}
+        {selectedIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
+            <span className="text-sm font-medium text-amber-900">
+              {selectedIds.length} To Do task{selectedIds.length === 1 ? '' : 's'} selected
+            </span>
+            <span className="text-xs text-amber-800/80">Only To Do tasks can be deactivated.</span>
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => setSelectedIds([])}
+              >
+                Clear
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="h-8 gap-1.5"
+                disabled={bulkDeactivateMutation.isPending}
+                onClick={() => setBulkConfirmOpen(true)}
+              >
+                <Power className="h-3.5 w-3.5" />
+                Deactivate{bulkDeactivateMutation.isPending ? '…' : ''}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {!filtered.length ? (
@@ -408,6 +496,19 @@ export function MyAssignedTasksPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="w-10 px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={allSelectableChecked}
+                        disabled={selectableIds.length === 0}
+                        onCheckedChange={() => toggleAllSelectable()}
+                        aria-label="Select all To Do tasks"
+                        title={
+                          selectableIds.length === 0
+                            ? 'No To Do tasks to select'
+                            : 'Select all To Do tasks'
+                        }
+                      />
+                    </th>
                     <th className="w-10 px-2 py-3 font-medium" aria-label="Top task">
                       <span className="sr-only">Top</span>
                     </th>
@@ -437,9 +538,23 @@ export function MyAssignedTasksPage() {
                         className={cn(
                           'border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer',
                           clientAssigned && 'bg-violet-50/70 hover:bg-violet-50',
+                          selectedIds.includes(task.id) && 'bg-amber-50/60 hover:bg-amber-50',
                         )}
                         onClick={() => openDetail(task)}
                       >
+                        <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.includes(task.id)}
+                            disabled={task.status !== 'todo'}
+                            onCheckedChange={() => toggleOne(task.id)}
+                            aria-label={`Select task #${task.id}`}
+                            title={
+                              task.status !== 'todo'
+                                ? 'Only To Do tasks can be deactivated in bulk'
+                                : `Select task #${task.id}`
+                            }
+                          />
+                        </td>
                         <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                           <TopStarButton task={task} size="xs" />
                         </td>
@@ -585,6 +700,40 @@ export function MyAssignedTasksPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deactivate {selectedIds.length} task{selectedIds.length === 1 ? '' : 's'}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <p className="text-sm text-muted-foreground">
+              This will hide {selectedIds.length === 1 ? 'this task' : 'these tasks'} from the
+              board. Only To Do tasks are included{selectedIds.length > 0 ? ` (${selectedIds.slice(0, 5).map((id) => `#${id}`).join(', ')}${selectedIds.length > 5 ? ` +${selectedIds.length - 5} more` : ''})` : ''}.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Tasks in other statuses cannot be bulk-deactivated — move them back to To Do first
+              or deactivate them individually.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkConfirmOpen(false)}
+              disabled={bulkDeactivateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={selectedIds.length === 0 || bulkDeactivateMutation.isPending}
+              onClick={() => bulkDeactivateMutation.mutate(selectedIds)}
+            >
+              {bulkDeactivateMutation.isPending ? 'Deactivating…' : `Deactivate ${selectedIds.length}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pickProjectOpen} onOpenChange={setPickProjectOpen}>
         <DialogContent className="max-w-md">

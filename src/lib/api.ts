@@ -636,6 +636,24 @@ export async function deactivateTask(taskId: number): Promise<Task> {
   return data
 }
 
+export interface BulkDeactivateResponse {
+  deactivated: number[]
+  skipped: { id: number; reason: string }[]
+  count: number
+}
+
+/**
+ * Bulk deactivate (soft-delete) tasks. Only `todo` tasks are deactivated;
+ * others are reported in `skipped`.
+ */
+export async function bulkDeactivateTasks(taskIds: number[]): Promise<BulkDeactivateResponse> {
+  const { data } = await api.post<BulkDeactivateResponse>(
+    `/${portalBase()}/tasks/bulk-deactivate`,
+    { task_ids: taskIds },
+  )
+  return data
+}
+
 export async function activateTask(taskId: number): Promise<Task> {
   const { data } = await api.post<Task>(`/${portalBase()}/tasks/${taskId}/activate`)
   return data

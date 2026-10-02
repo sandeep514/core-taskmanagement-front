@@ -4,6 +4,7 @@ import { ArrowUpDown, Check } from 'lucide-react'
 import type { Task, TaskStatus } from '@/types'
 import { TASK_STATUSES } from '@/types'
 import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   KANBAN_SORT_OPTIONS,
   kanbanSortShortLabel,
@@ -25,6 +26,10 @@ interface KanbanColumnProps {
   /** Effective sort for this column (resolved by the board). */
   sort?: KanbanSort
   onSortChange?: (status: TaskStatus, sort: KanbanSort) => void
+  /** Bulk-select (To Do only): ids + toggles, supplied by the board. */
+  selectedIds?: number[]
+  onToggleSelect?: (taskId: number) => void
+  onToggleAll?: () => void
 }
 
 export function KanbanColumn({
@@ -34,6 +39,9 @@ export function KanbanColumn({
   canMoveTask,
   sort = 'auto',
   onSortChange,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
 }: KanbanColumnProps) {
   const meta = TASK_STATUSES.find((s) => s.value === status)!
   const { setNodeRef, isOver } = useDroppable({
@@ -51,8 +59,19 @@ export function KanbanColumn({
       )}
     >
       <div className="flex items-center justify-between gap-1.5 px-3 py-2.5 border-b border-border/60">
-        <span className={cn('rounded-md border px-2 py-0.5 text-xs font-semibold truncate', meta.color)}>
-          {meta.label}
+        <span className="flex items-center gap-1.5 min-w-0">
+          {status === 'todo' && onToggleAll && (
+            <Checkbox
+              checked={tasks.length > 0 && tasks.every((t) => selectedIds?.includes(t.id))}
+              onCheckedChange={() => onToggleAll()}
+              aria-label="Select all To Do tasks"
+              title="Select all To Do tasks"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-semibold truncate', meta.color)}>
+            {meta.label}
+          </span>
         </span>
         <span className="flex items-center gap-1 shrink-0">
           <span className="text-xs font-medium text-muted-foreground bg-card rounded-full h-6 min-w-6 px-1.5 flex items-center justify-center border border-border">
@@ -94,12 +113,27 @@ export function KanbanColumn({
       >
         <SortableContext id={status} items={itemIds} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onClick={() => onTaskClick(task)}
-              dragDisabled={canMoveTask ? !canMoveTask(task) : false}
-            />
+            <div key={task.id} className="relative">
+              {status === 'todo' && onToggleSelect && (
+                <span
+                  className="absolute left-2 top-2 z-10 rounded bg-card/90 p-0.5 shadow-sm"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={selectedIds?.includes(task.id) ?? false}
+                    onCheckedChange={() => onToggleSelect(task.id)}
+                    aria-label={`Select task #${task.id}`}
+                    title="Select for bulk deactivate (To Do only)"
+                  />
+                </span>
+              )}
+              <TaskCard
+                task={task}
+                onClick={() => onTaskClick(task)}
+                dragDisabled={canMoveTask ? !canMoveTask(task) : false}
+              />
+            </div>
           ))}
         </SortableContext>
 

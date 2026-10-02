@@ -12,13 +12,22 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Power } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Task, TaskStatus } from '@/types'
 import { TASK_STATUSES } from '@/types'
-import { updateTaskStatus } from '@/lib/api'
+import { bulkDeactivateTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import { canChangeTaskStatus } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { KanbanColumn } from './KanbanColumn'
 import { TaskCardContent } from './TaskCard'
 import {
@@ -143,6 +152,42 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
     },
   })
 
+  // ── Bulk deactivate (To Do column only) ────────────────────────────────
+  const [selectedTodoIds, setSelectedTodoIds] = useState<number[]>([])
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
+
+  // Prune selection when board data changes.
+  useEffect(() => {
+    setSelectedTodoIds((prev) => prev.filter((id) => tasks.some((t) => t.id === id && t.status === 'todo')))
+  }, [tasks])
+
+  const toggleTodoSelect = (taskId: number) => {
+    setSelectedTodoIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId],
+    )
+  }
+
+  const toggleAllTodo = (todoTasks: Task[]) => {
+    const ids = todoTasks.map((t) => t.id)
+    setSelectedTodoIds((prev) => (ids.every((id) => prev.includes(id)) ? [] : ids))
+  }
+
+  const bulkDeactivateMutation = useMutation({
+    mutationFn: (ids: number[]) => bulkDeactivateTasks(ids),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+      setSelectedTodoIds([])
+      setBulkConfirmOpen(false)
+      if (res.count > 0) {
+        toast.success(`Deactivated ${res.count} task${res.count === 1 ? '' : 's'}`)
+      } else {
+        toast.error(res.skipped[0]?.reason ?? 'Nothing deactivated.')
+      }
+    },
+    onError: (err) => toast.error(getApiError(err, 'Failed to deactivate tasks')),
+  })
+
   function findContainer(id: UniqueIdentifier): TaskStatus | null {
     if (isColumnId(id)) return id
 
@@ -231,35 +276,103 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin">
-        {TASK_STATUSES.map((col) => (
-          <KanbanColumn
-            key={col.value}
-            status={col.value}
-            tasks={columns[col.value]}
-            onTaskClick={onTaskClick}
-            canMoveTask={canMoveTask}
-            sort={resolveColumnSort(col.value, columnSorts)}
-            onSortChange={handleColumnSortChange}
-          />
-        ))}
-      </div>
-
-      <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
-        {activeTask ? (
-          <div className="w-[260px]">
-            <TaskCardContent task={activeTask} isOverlay />
+    <>
+      {selectedTodoIds.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
+          <span className="text-sm font-medium text-amber-900">
+            {selectedTodoIds.length} To Do task{selectedTodoIds.length === 1 ? '' : 's'} selected
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8"
+              onClick={() => setSelectedTodoIds([])}
+            >
+              Clear
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="h-8 gap-1.5"
+              disabled={bulkDeactivateMutation.isPending}
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <Power className="h-3.5 w-3.5" />
+              Deactivate
+            </Button>
           </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+        </div>
+      )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin">
+          {TASK_STATUSES.map((col) => (
+            <KanbanColumn
+              key={col.value}
+              status={col.value}
+              tasks={columns[col.value]}
+              onTaskClick={onTaskClick}
+              canMoveTask={canMoveTask}
+              sort={resolveColumnSort(col.value, columnSorts)}
+              onSortChange={handleColumnSortChange}
+              selectedIds={col.value === 'todo' ? selectedTodoIds : undefined}
+              onToggleSelect={col.value === 'todo' ? toggleTodoSelect : undefined}
+              onToggleAll={
+                col.value === 'todo' ? () => toggleAllTodo(columns.todo) : undefined
+              }
+            />
+          ))}
+        </div>
+
+        <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
+          {activeTask ? (
+            <div className="w-[260px]">
+              <TaskCardContent task={activeTask} isOverlay />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Deactivate {selectedTodoIds.length} To Do task{selectedTodoIds.length === 1 ? '' : 's'}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="py-1 text-sm text-muted-foreground">
+            This will hide the selected To Do tasks from the board. This cannot be undone from
+            the board — an admin can re-activate them.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkConfirmOpen(false)}
+              disabled={bulkDeactivateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={selectedTodoIds.length === 0 || bulkDeactivateMutation.isPending}
+              onClick={() => bulkDeactivateMutation.mutate(selectedTodoIds)}
+            >
+              {bulkDeactivateMutation.isPending
+                ? 'Deactivating…'
+                : `Deactivate ${selectedTodoIds.length}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
