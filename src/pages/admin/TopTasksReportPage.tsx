@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, Star } from 'lucide-react'
+import { CalendarDays, CheckCircle2, CircleAlert, Star, UserRoundX } from 'lucide-react'
 import {
   fetchEmployees,
   fetchProjects,
+  fetchTopTasksCompliance,
   fetchTopTasksReport,
   portalUiBase,
 } from '@/lib/api'
@@ -42,6 +43,7 @@ export function TopTasksReportPage() {
   const [date, setDate] = useState(todayKey())
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
+  const [complianceFilter, setComplianceFilter] = useState<'all' | 'done' | 'pending' | 'none'>('all')
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -66,6 +68,26 @@ export function TopTasksReportPage() {
         project_id: projectFilter !== 'all' ? Number(projectFilter) : null,
       }),
   })
+
+  const { data: compliance } = useQuery({
+    queryKey: ['top-tasks-compliance', date, projectFilter],
+    queryFn: () =>
+      fetchTopTasksCompliance({
+        date: date || undefined,
+        project_id: projectFilter !== 'all' ? Number(projectFilter) : null,
+      }),
+  })
+
+  const complianceRows = useMemo(() => {
+    let list = compliance?.employees ?? []
+    if (employeeFilter !== 'all') {
+      list = list.filter((e) => e.id === Number(employeeFilter))
+    }
+    if (complianceFilter === 'done') list = list.filter((e) => e.is_done)
+    else if (complianceFilter === 'pending') list = list.filter((e) => !e.is_done)
+    else if (complianceFilter === 'none') list = list.filter((e) => !e.has_marked)
+    return list
+  }, [compliance, employeeFilter, complianceFilter])
 
   const rows = report?.data ?? []
 
@@ -193,7 +215,124 @@ export function TopTasksReportPage() {
         </Badge>
         <Badge variant="secondary">{summary.employees} employees</Badge>
         <Badge variant="secondary">{summary.projects} projects</Badge>
+        {compliance?.summary && (
+          <>
+            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 gap-1.5 px-3 py-1">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {compliance.summary.done}/{compliance.summary.total} marked 3+
+            </Badge>
+            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 gap-1.5 px-3 py-1">
+              <CircleAlert className="h-3.5 w-3.5" />
+              {compliance.summary.pending} pending
+            </Badge>
+            {compliance.summary.marked_none > 0 && (
+              <Badge className="bg-red-100 text-red-700 hover:bg-red-100 gap-1.5 px-3 py-1">
+                <UserRoundX className="h-3.5 w-3.5" />
+                {compliance.summary.marked_none} marked none
+              </Badge>
+            )}
+          </>
+        )}
       </div>
+
+      {/* ── Who marked / who did not (per employee) ─────────────────────── */}
+      <Card className="mb-6">
+        <CardContent className="p-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Top 3 compliance by employee</h2>
+              <p className="text-xs text-muted-foreground">
+                Who marked their Top tasks for {compliance?.date ? formatDate(compliance.date) : 'the selected date'} — min {compliance?.min_required ?? 3} across all projects.
+              </p>
+            </div>
+            <Select value={complianceFilter} onValueChange={(v) => setComplianceFilter(v as typeof complianceFilter)}>
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All employees</SelectItem>
+                <SelectItem value="done">Done (3+)</SelectItem>
+                <SelectItem value="pending">Pending (&lt; 3)</SelectItem>
+                <SelectItem value="none">Marked none (0)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {!complianceRows.length ? (
+            <p className="px-4 py-6 text-sm text-muted-foreground">
+              No employees match this filter.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">Employee</th>
+                    <th className="px-4 py-3 font-medium">Marked</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Top tasks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {complianceRows.map((e) => (
+                    <tr key={e.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-foreground">{e.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {[e.designation, e.department].filter(Boolean).join(' · ') || e.email}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="tabular-nums font-semibold">
+                          {e.marked_count}/{compliance?.min_required ?? 3}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.is_done ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Done
+                          </span>
+                        ) : e.has_marked ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                            <CircleAlert className="h-3 w-3" />
+                            Missing {e.missing}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                            <UserRoundX className="h-3 w-3" />
+                            Not marked
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.tasks.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <ul className="space-y-1">
+                            {e.tasks.map((t) => (
+                              <li key={t.id} className="text-xs">
+                                <span className="font-medium text-foreground">#{t.id}</span>{' '}
+                                <span className="text-muted-foreground">{t.title}</span>
+                                {t.project_name && (
+                                  <span className="text-muted-foreground"> · {t.project_name}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        Marked tasks detail
+      </h2>
 
       {!rows.length ? (
         <EmptyState

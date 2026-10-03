@@ -630,6 +630,58 @@ export async function fetchTopTasksReport(params: {
   return data
 }
 
+export interface TopTasksComplianceTask {
+  id: number
+  title: string
+  project_id: number
+  project_name?: string | null
+  status: string
+  priority: string
+}
+
+export interface TopTasksComplianceEmployee {
+  id: number
+  name: string
+  email: string
+  department?: string | null
+  designation?: string | null
+  marked_count: number
+  has_marked: boolean
+  is_done: boolean
+  missing: number
+  tasks: TopTasksComplianceTask[]
+}
+
+export interface TopTasksComplianceResponse {
+  date: string
+  min_required: number
+  summary: {
+    total: number
+    done: number
+    pending: number
+    marked_any: number
+    marked_none: number
+  }
+  employees: TopTasksComplianceEmployee[]
+}
+
+/** Admin/HR report: per-employee Top-3 compliance — who marked, who did not. */
+export async function fetchTopTasksCompliance(params: {
+  date?: string
+  project_id?: number | null
+}): Promise<TopTasksComplianceResponse> {
+  const { data } = await api.get<TopTasksComplianceResponse>(
+    `/${portalBase()}/top-tasks-compliance`,
+    {
+      params: {
+        ...(params.date ? { date: params.date } : {}),
+        ...(params.project_id ? { project_id: params.project_id } : {}),
+      },
+    },
+  )
+  return data
+}
+
 /** Soft-deactivate task (hidden from Kanban). */
 export async function deactivateTask(taskId: number): Promise<Task> {
   const { data } = await api.delete<Task>(`/${portalBase()}/tasks/${taskId}`)
