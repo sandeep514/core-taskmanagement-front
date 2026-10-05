@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Building2, Pencil, Plus, Power } from 'lucide-react'
+import { Building2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createDepartment,
@@ -33,6 +33,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { EntityList } from '@/components/ui/entity-list'
+import { EntityActions } from '@/components/ui/entity-actions'
 
 const empty = { department: '', description: '', status: 'active' as EntityStatus }
 
@@ -111,9 +113,43 @@ export function DepartmentsPage() {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {data.map((item) => (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
+        <EntityList
+          items={data}
+          viewKey="departments:view"
+          noun="departments"
+          searchText={(d) => `${d.department} ${d.description ?? ''}`}
+          primary={{
+            header: 'Department',
+            cell: (d) => (
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-indigo-50 p-1.5">
+                  <Building2 className="h-4 w-4 text-indigo-600" />
+                </div>
+                <span className="font-medium text-foreground">{d.department}</span>
+              </div>
+            ),
+          }}
+          columns={[
+            {
+              header: 'Description',
+              hideBelow: 'md',
+              cell: (d) => (
+                <span className="block max-w-md truncate" title={d.description ?? undefined}>
+                  {d.description || '—'}
+                </span>
+              ),
+            },
+          ]}
+          renderActions={(d) => (
+            <EntityActions
+              name={d.department}
+              status={d.status}
+              onEdit={() => openEdit(d)}
+              onToggle={() => toggle.mutate(d.id)}
+            />
+          )}
+          renderCard={(d) => (
+            <Card className="h-full hover:shadow-md transition-shadow">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
@@ -121,41 +157,26 @@ export function DepartmentsPage() {
                       <Building2 className="h-5 w-5 text-indigo-600" />
                     </div>
                     <div>
-                      <p className="font-semibold">{item.department}</p>
-                      <Badge
-                        variant={item.status === 'active' ? 'success' : 'muted'}
-                        className="mt-1"
-                      >
-                        {item.status}
+                      <p className="font-semibold">{d.department}</p>
+                      <Badge variant={d.status === 'active' ? 'success' : 'muted'} className="mt-1">
+                        {d.status}
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title={item.status === 'active' ? 'Deactivate' : 'Activate'}
-                      className={
-                        item.status === 'active'
-                          ? 'text-amber-600 hover:text-amber-700'
-                          : 'text-emerald-600 hover:text-emerald-700'
-                      }
-                      onClick={() => toggle.mutate(item.id)}
-                    >
-                      <Power className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <EntityActions
+                    name={d.department}
+                    status={d.status}
+                    onEdit={() => openEdit(d)}
+                    onToggle={() => toggle.mutate(d.id)}
+                  />
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
-                  {item.description || 'No description'}
+                  {d.description || 'No description'}
                 </p>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Power, Users } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createEmployee,
@@ -34,6 +34,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { EntityList } from '@/components/ui/entity-list'
+import { EntityActions } from '@/components/ui/entity-actions'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { initials, formatDateTime } from '@/lib/utils'
 
@@ -140,79 +142,87 @@ export function EmployeesPage() {
           }
         />
       ) : (
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/40 text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Employee</th>
-                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Department</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Designation</th>
-                  <th className="px-4 py-3 font-medium hidden xl:table-cell text-right">Activities</th>
-                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Last activity</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((item) => (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-[10px]">{initials(item.name)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
-                      {item.department?.department ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                      {item.designation?.designation ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell text-right tabular-nums">
-                      {item.activities_count ?? 0}
-                    </td>
-                    <td className="px-4 py-3 hidden xl:table-cell text-muted-foreground whitespace-nowrap">
-                      {item.last_activity_at
-                        ? formatDateTime(item.last_activity_at)
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={item.status === 'active' ? 'success' : 'muted'}>
-                        {item.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title={item.status === 'active' ? 'Deactivate' : 'Activate'}
-                          className={
-                            item.status === 'active'
-                              ? 'text-amber-600 hover:text-amber-700'
-                              : 'text-emerald-600 hover:text-emerald-700'
-                          }
-                          onClick={() => toggle.mutate(item.id)}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        <EntityList
+          items={data}
+          viewKey="employees:view"
+          noun="employees"
+          searchText={(e) =>
+            `${e.name} ${e.email} ${e.department?.department ?? ''} ${e.designation?.designation ?? ''}`
+          }
+          primary={{
+            header: 'Employee',
+            cell: (e) => (
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-[10px]">{initials(e.name)}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{e.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{e.email}</p>
+                </div>
+              </div>
+            ),
+          }}
+          columns={[
+            { header: 'Department', hideBelow: 'lg', cell: (e) => e.department?.department ?? '—' },
+            { header: 'Designation', hideBelow: 'md', cell: (e) => e.designation?.designation ?? '—' },
+            {
+              header: 'Activities',
+              hideBelow: 'xl',
+              align: 'right',
+              cell: (e) => <span className="tabular-nums">{e.activities_count ?? 0}</span>,
+            },
+            {
+              header: 'Last activity',
+              hideBelow: 'xl',
+              cell: (e) => (
+                <span className="whitespace-nowrap">
+                  {e.last_activity_at ? formatDateTime(e.last_activity_at) : '—'}
+                </span>
+              ),
+            },
+          ]}
+          renderActions={(e) => (
+            <EntityActions
+              name={e.name}
+              status={e.status}
+              onEdit={() => openEdit(e)}
+              onToggle={() => toggle.mutate(e.id)}
+            />
+          )}
+          renderCard={(e) => (
+            <Card className="h-full hover:shadow-md transition-shadow">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback>{initials(e.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{e.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">{e.email}</p>
+                    </div>
+                  </div>
+                  <EntityActions
+                    name={e.name}
+                    status={e.status}
+                    onEdit={() => openEdit(e)}
+                    onToggle={() => toggle.mutate(e.id)}
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Badge variant={e.status === 'active' ? 'success' : 'muted'}>{e.status}</Badge>
+                  {e.department && <Badge variant="outline">{e.department.department}</Badge>}
+                  {e.designation && <Badge variant="outline">{e.designation.designation}</Badge>}
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {e.activities_count ?? 0} activities
+                  {e.last_activity_at ? ` · last ${formatDateTime(e.last_activity_at)}` : ''}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        />
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>

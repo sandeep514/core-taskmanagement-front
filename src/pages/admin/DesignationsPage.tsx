@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Power } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createDesignation,
@@ -33,6 +33,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { EntityList } from '@/components/ui/entity-list'
+import { EntityActions } from '@/components/ui/entity-actions'
 import { BadgeCheck } from 'lucide-react'
 
 const empty = { designation: '', description: '', status: 'active' as EntityStatus }
@@ -112,55 +114,70 @@ export function DesignationsPage() {
           }
         />
       ) : (
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/40 text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Designation</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Description</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((item) => (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-secondary/30">
-                    <td className="px-4 py-3 font-medium">{item.designation}</td>
-                    <td className="px-4 py-3 text-muted-foreground hidden md:table-cell max-w-xs truncate">
-                      {item.description || '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={item.status === 'active' ? 'success' : 'muted'}>
-                        {item.status}
+        <EntityList
+          items={data}
+          viewKey="designations:view"
+          noun="designations"
+          searchText={(d) => `${d.designation} ${d.description ?? ''}`}
+          primary={{
+            header: 'Designation',
+            cell: (d) => (
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-indigo-50 p-1.5">
+                  <BadgeCheck className="h-4 w-4 text-indigo-600" />
+                </div>
+                <span className="font-medium text-foreground">{d.designation}</span>
+              </div>
+            ),
+          }}
+          columns={[
+            {
+              header: 'Description',
+              hideBelow: 'md',
+              cell: (d) => (
+                <span className="block max-w-md truncate" title={d.description ?? undefined}>
+                  {d.description || '—'}
+                </span>
+              ),
+            },
+          ]}
+          renderActions={(d) => (
+            <EntityActions
+              name={d.designation}
+              status={d.status}
+              onEdit={() => openEdit(d)}
+              onToggle={() => toggle.mutate(d.id)}
+            />
+          )}
+          renderCard={(d) => (
+            <Card className="h-full hover:shadow-md transition-shadow">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-indigo-50 p-2.5">
+                      <BadgeCheck className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{d.designation}</p>
+                      <Badge variant={d.status === 'active' ? 'success' : 'muted'} className="mt-1">
+                        {d.status}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title={item.status === 'active' ? 'Deactivate' : 'Activate'}
-                          className={
-                            item.status === 'active'
-                              ? 'text-amber-600 hover:text-amber-700'
-                              : 'text-emerald-600 hover:text-emerald-700'
-                          }
-                          onClick={() => toggle.mutate(item.id)}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+                    </div>
+                  </div>
+                  <EntityActions
+                    name={d.designation}
+                    status={d.status}
+                    onEdit={() => openEdit(d)}
+                    onToggle={() => toggle.mutate(d.id)}
+                  />
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
+                  {d.description || 'No description'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        />
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>

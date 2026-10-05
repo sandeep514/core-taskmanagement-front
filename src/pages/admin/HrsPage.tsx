@@ -27,6 +27,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { EntityList } from '@/components/ui/entity-list'
+import { EntityActions } from '@/components/ui/entity-actions'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { initials } from '@/lib/utils'
 
@@ -119,45 +121,69 @@ export function HrsPage() {
           }
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => (
-            <Card key={item.id}>
+        <EntityList
+          items={items}
+          viewKey="hrs:view"
+          noun="HR accounts"
+          searchText={(h) => `${h.name} ${h.email}`}
+          primary={{
+            header: 'HR',
+            cell: (h) => (
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-teal-600 text-white text-[10px]">
+                    {initials(h.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-medium text-foreground truncate">{h.name}</span>
+              </div>
+            ),
+          }}
+          columns={[{ header: 'Email', cell: (h) => <span className="block truncate max-w-xs">{h.email}</span> }]}
+          renderActions={(h) => (
+            <EntityActions
+              name={h.name}
+              status={h.status}
+              disabled={toggle.isPending}
+              onEdit={() => openEdit(h)}
+              onToggle={() => toggle.mutate(h.id)}
+            />
+          )}
+          renderCard={(h) => (
+            <Card className="h-full">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-teal-600 text-white">
-                      {initials(item.name)}
-                    </AvatarFallback>
+                    <AvatarFallback className="bg-teal-600 text-white">{initials(h.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold truncate">{item.name}</p>
-                      <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
-                        {item.status}
-                      </Badge>
+                      <p className="font-semibold truncate">{h.name}</p>
+                      <Badge variant={h.status === 'active' ? 'default' : 'secondary'}>{h.status}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{item.email}</p>
+                    <p className="text-sm text-muted-foreground truncate">{h.email}</p>
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(item)}>
+                  <Button variant="outline" size="sm" onClick={() => openEdit(h)}>
                     <Pencil className="h-3.5 w-3.5" />
                     Edit
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => toggle.mutate(item.id)}
+                    onClick={() => toggle.mutate(h.id)}
                     disabled={toggle.isPending}
                   >
                     <Power className="h-3.5 w-3.5" />
-                    {item.status === 'active' ? 'Deactivate' : 'Activate'}
+                    {h.status === 'active' ? 'Deactivate' : 'Activate'}
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+          cardGridClassName="gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        />
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>

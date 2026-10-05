@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Briefcase, Mail, Pencil, Phone, Plus, Power } from 'lucide-react'
+import { Briefcase, Mail, Pencil, Phone, Plus, Power, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createClient,
@@ -33,6 +33,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ClientsTable } from '@/components/clients/ClientsTable'
+import { useListView } from '@/hooks/use-list-view'
+import { ListToolbar, type StatusFilter } from '@/components/ui/list-toolbar'
 
 const empty = {
   name: '',
@@ -50,6 +53,21 @@ export function ClientsPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Client | null>(null)
   const [form, setForm] = useState(empty)
+  const [view, changeView] = useListView('clients:view')
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return (data ?? []).filter(
+      (c) =>
+        (statusFilter === 'all' || c.status === statusFilter) &&
+        (!q ||
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          (c.mobile ?? '').toLowerCase().includes(q)),
+    )
+  }, [data, query, statusFilter])
 
   const save = useMutation({
     mutationFn: async () => {
@@ -130,8 +148,30 @@ export function ClientsPage() {
           }
         />
       ) : (
+        <>
+          <ListToolbar
+            query={query}
+            onQueryChange={setQuery}
+            searchLabel="Search clients"
+            searchPlaceholder="Search name, email or phone"
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            summary={`${filtered.length} of ${data.length}`}
+            view={view}
+            onViewChange={changeView}
+          />
+
+          {!filtered.length ? (
+            <EmptyState
+              icon={Search}
+              title="No matching clients"
+              description="Try a different search or status filter."
+            />
+          ) : view === 'table' ? (
+            <ClientsTable clients={filtered} onEdit={openEdit} onToggle={(c) => toggle.mutate(c.id)} />
+          ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {data.map((item) => (
+          {filtered.map((item) => (
             <Card key={item.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
@@ -184,6 +224,8 @@ export function ClientsPage() {
             </Card>
           ))}
         </div>
+          )}
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
