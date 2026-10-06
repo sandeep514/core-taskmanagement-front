@@ -356,15 +356,17 @@ export function canMarkTopTask(task: {
 }
 
 /**
- * True when task is marked as a Top task.
- * Persistent: once marked it stays checked across dates until explicitly
- * unmarked (previous-date marks are NOT auto-unchecked).
+ * True when task is marked as a Top task for today (daily reset via top_task_date).
+ * Only today's marks count — previous dates never appear in Top lists/counts.
  */
 export function isTopToday(task: {
   is_top_task?: boolean | null
   top_task_date?: string | null
 }): boolean {
-  return Boolean(task.is_top_task)
+  if (!task.is_top_task) return false
+  if (!task.top_task_date) return false
+  const raw = String(task.top_task_date).slice(0, 10)
+  return raw === todayKey()
 }
 
 /** Count of today's Top tasks in a list. */

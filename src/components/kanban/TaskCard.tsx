@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, Star, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_TYPES, canMarkTopTask, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_TYPES, isTopToday } from '@/types'
 import { toggleTaskTop } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import {
@@ -14,20 +14,23 @@ import {
   formatTaskAssignees,
   formatTaskCreatedAt,
   formatTaskCreator,
+  canToggleTopTask,
   initials,
   isClientAssignedTask,
   isOverdue,
 } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ProgressBar } from '@/components/ui/progress-bar'
+import { useAuthStore } from '@/stores/authStore'
 
 /** Star button to mark / unmark a task as Top for today. Stops card-open + drag. */
 export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' | 'xs' }) {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
   const top = isTopToday(task)
-  // Never offer Top-marking on unassigned / todo / discussion tasks.
-  // Still show the (filled) star when already marked so it can be removed.
-  if (!canMarkTopTask(task) && !top) return null
+  // Never offer Top-marking on unassigned / todo / discussion tasks, and only
+  // on the viewer's own assigned tasks (admin / HR exempt).
+  if (!canToggleTopTask(task, user)) return null
   const mutation = useMutation({
     mutationFn: () => toggleTaskTop(task.id),
     onSuccess: () => {

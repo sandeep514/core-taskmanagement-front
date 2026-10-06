@@ -31,7 +31,7 @@ import {
   toggleTaskTop,
 } from '@/lib/api'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, canMarkTopTask, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, isTopToday } from '@/types'
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i
 
@@ -49,6 +49,7 @@ function isImageAttachment(a: {
 import {
   canDeleteTaskAttachment,
   canEditTask,
+  canToggleTopTask,
   cn,
   formatDate,
   formatTaskAssignees,
@@ -186,9 +187,9 @@ export function TaskDetailModal({
   })
 
   const topToday = task ? isTopToday(task) : false
-  // Top-marking is only offered on assigned tasks outside todo / discussion.
-  // An already-marked task still shows the button so it can be removed.
-  const canShowTopButton = task ? canMarkTopTask(task) || topToday : false
+  // Top-marking is only offered on the viewer's own assigned tasks outside
+  // todo / discussion (admin / HR exempt).
+  const canShowTopButton = task ? canToggleTopTask(task, user) : false
 
   const priority = TASK_PRIORITIES.find((p) => p.value === task?.priority)
   const status = TASK_STATUSES.find((s) => s.value === task?.status)

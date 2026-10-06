@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { canMarkTopTask, isTopToday } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -264,6 +265,31 @@ export function isClientAssignedTask(task: {
   client_assignee?: { id: number } | null
 }): boolean {
   return Boolean(task.assigned_to_client || task.client_assignee)
+}
+
+/**
+ * Whether the current user may toggle the Top star on this task:
+ * only their own assigned tasks (admin / HR may toggle any task).
+ * Already-marked tasks stay toggleable so today's mark can be removed.
+ */
+export function canToggleTopTask(
+  task: {
+    status?: string | null
+    is_top_task?: boolean | null
+    top_task_date?: string | null
+    assigned_to_ids?: number[] | null
+    assignees?: { id: number }[] | null
+    assigned_to?: number | null
+    assigned_to_client?: number | null
+    client_assignee?: { id: number } | null
+  },
+  user: { id: number; role?: string } | null | undefined,
+): boolean {
+  if (!user) return false
+  const top = isTopToday(task)
+  if (!canMarkTopTask(task) && !top) return false
+  if (user.role === 'admin' || user.role === 'hr') return true
+  return isTaskAssignedToUser(task, user.id, user.role)
 }
 
 export function isOverdue(date: string | null | undefined, status?: string) {
