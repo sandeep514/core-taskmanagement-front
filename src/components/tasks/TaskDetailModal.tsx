@@ -435,6 +435,62 @@ export function TaskDetailModal({
 
               <Separator />
 
+              {/* Comments */}
+              <div>
+                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                  <MessageSquare className="h-4 w-4" />
+                  Comments
+                  <Badge variant="secondary">{task.comments?.length ?? 0}</Badge>
+                </h4>
+
+                <div className="space-y-3 mb-4">
+                  {(task.comments?.length ?? 0) === 0 && (
+                    <p className="text-sm text-muted-foreground">No comments yet</p>
+                  )}
+                  {task.comments?.map((c) => (
+                    <div key={c.id} className="flex gap-3">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="text-[10px]">
+                          {initials(c.user_name || 'U')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 rounded-lg bg-secondary/60 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">{c.user_name || 'User'}</p>
+                          <span className="text-[11px] text-muted-foreground">
+                            {formatDate(c.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-sm mt-1 text-foreground/90">{c.comment}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <Textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Write a comment…"
+                    className="min-h-[72px]"
+                  />
+                  <Button
+                    size="icon"
+                    className="h-10 w-10 shrink-0 self-end"
+                    disabled={!comment.trim() || commentMutation.isPending}
+                    onClick={() => commentMutation.mutate()}
+                  >
+                    {commentMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
               <TaskSubtaskList
                 task={task}
                 projectId={projectId}
@@ -628,62 +684,6 @@ export function TaskDetailModal({
                     ))}
                   </ul>
                 )}
-              </div>
-
-              <Separator />
-
-              {/* Comments */}
-              <div>
-                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                  <MessageSquare className="h-4 w-4" />
-                  Comments
-                  <Badge variant="secondary">{task.comments?.length ?? 0}</Badge>
-                </h4>
-
-                <div className="space-y-3 mb-4">
-                  {(task.comments?.length ?? 0) === 0 && (
-                    <p className="text-sm text-muted-foreground">No comments yet</p>
-                  )}
-                  {task.comments?.map((c) => (
-                    <div key={c.id} className="flex gap-3">
-                      <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarFallback className="text-[10px]">
-                          {initials(c.user_name || 'U')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 rounded-lg bg-secondary/60 px-3 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium">{c.user_name || 'User'}</p>
-                          <span className="text-[11px] text-muted-foreground">
-                            {formatDate(c.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-sm mt-1 text-foreground/90">{c.comment}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <Textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Write a comment…"
-                    className="min-h-[72px]"
-                  />
-                  <Button
-                    size="icon"
-                    className="h-10 w-10 shrink-0 self-end"
-                    disabled={!comment.trim() || commentMutation.isPending}
-                    onClick={() => commentMutation.mutate()}
-                  >
-                    {commentMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
               </div>
             </div>
           </>
