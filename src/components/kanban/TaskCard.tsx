@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, Star, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_TYPES, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_TYPES, canMarkTopTask, isTopToday } from '@/types'
 import { toggleTaskTop } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import {
@@ -25,6 +25,9 @@ import { ProgressBar } from '@/components/ui/progress-bar'
 export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' | 'xs' }) {
   const qc = useQueryClient()
   const top = isTopToday(task)
+  // Never offer Top-marking on unassigned / todo / discussion tasks.
+  // Still show the (filled) star when already marked so it can be removed.
+  if (!canMarkTopTask(task) && !top) return null
   const mutation = useMutation({
     mutationFn: () => toggleTaskTop(task.id),
     onSuccess: () => {

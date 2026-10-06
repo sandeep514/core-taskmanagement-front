@@ -334,15 +334,37 @@ export function todayKey(d = new Date()): string {
   return `${y}-${m}-${day}`
 }
 
-/** True when task is marked as Top for today (daily reset via top_task_date). */
+/**
+ * True when a task is eligible for Top-3 marking.
+ * Hidden for unassigned tasks and for `todo` / `discussion` statuses.
+ */
+export function canMarkTopTask(task: {
+  status?: string | null
+  assigned_to_ids?: number[] | null
+  assignees?: { id: number }[] | null
+  assigned_to?: number | null
+  assigned_to_client?: number | null
+  client_assignee?: { id: number } | null
+}): boolean {
+  if (task.status === 'todo' || task.status === 'discussion') return false
+  const hasEmployee =
+    (task.assigned_to_ids?.length ?? 0) > 0 ||
+    (task.assignees?.length ?? 0) > 0 ||
+    task.assigned_to != null
+  const hasClient = task.assigned_to_client != null || task.client_assignee != null
+  return hasEmployee || hasClient
+}
+
+/**
+ * True when task is marked as a Top task.
+ * Persistent: once marked it stays checked across dates until explicitly
+ * unmarked (previous-date marks are NOT auto-unchecked).
+ */
 export function isTopToday(task: {
   is_top_task?: boolean | null
   top_task_date?: string | null
 }): boolean {
-  if (!task.is_top_task) return false
-  if (!task.top_task_date) return false
-  const raw = String(task.top_task_date).slice(0, 10)
-  return raw === todayKey()
+  return Boolean(task.is_top_task)
 }
 
 /** Count of today's Top tasks in a list. */
