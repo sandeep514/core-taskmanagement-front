@@ -152,7 +152,7 @@ export function BulkAddTasksModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-indigo-500" />
@@ -194,9 +194,9 @@ export function BulkAddTasksModal({
                 <ListPlus className="h-3.5 w-3.5" />
                 Preview
               </p>
-              <ol className="list-decimal list-inside space-y-1 text-sm max-h-28 overflow-y-auto">
+              <ol className="list-decimal pl-5 space-y-1 text-sm max-h-40 overflow-y-auto">
                 {titles.map((t) => (
-                  <li key={t} className="truncate" title={t}>
+                  <li key={t} className="break-words">
                     {t}
                   </li>
                 ))}
