@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, Columns3, FolderKanban, Pencil, Plus, Power, Users } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FolderKanban, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   createProject,
@@ -18,7 +17,6 @@ import { useAuthStore } from '@/stores/authStore'
 import type { Project, ProjectFormData } from '@/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,10 +36,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
 import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
-import { formatDate } from '@/lib/utils'
+import { useListView } from '@/hooks/use-list-view'
+import { ListToolbar, type StatusFilter } from '@/components/ui/list-toolbar'
+import { ProjectsByClient } from '@/components/projects/ProjectsByClient'
+import { groupKey } from '@/components/projects/group-key'
 
 const emptyForm: ProjectFormData = {
   project_name: '',
@@ -68,6 +68,30 @@ export function ProjectsPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
   const [form, setForm] = useState<ProjectFormData>(emptyForm)
+  const [view, changeView] = useListView('projects:view')
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return (data ?? []).filter(
+      (p) =>
+        (statusFilter === 'all' || p.status === statusFilter) &&
+        (!q ||
+          p.project_name.toLowerCase().includes(q) ||
+          (p.client?.name ?? '').toLowerCase().includes(q)),
+    )
+  }, [data, query, statusFilter])
+
+  const groupKeys = useMemo(() => [...new Set(filtered.map(groupKey))], [filtered])
+  const allCollapsed = groupKeys.length > 0 && groupKeys.every((k) => collapsed.has(k))
+  const toggleGroup = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
 
   const save = useMutation({
     mutationFn: async () => {
@@ -144,84 +168,48 @@ export function ProjectsPage() {
           }
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {data.map((item) => (
-            <Card key={item.id} className="hover:shadow-md transition-shadow overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-violet-500" />
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-lg truncate">{item.project_name}</h3>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {item.client?.name ?? 'No client'}
-                    </p>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(item)} title="Edit">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title={item.status === 'active' ? 'Deactivate' : 'Activate'}
-                      className={
-                        item.status === 'active'
-                          ? 'text-amber-600 hover:text-amber-700'
-                          : 'text-emerald-600 hover:text-emerald-700'
-                      }
-                      onClick={() => toggle.mutate(item.id)}
-                    >
-                      <Power className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+        <>
+          <ListToolbar
+            query={query}
+            onQueryChange={setQuery}
+            searchLabel="Search projects"
+            searchPlaceholder="Search project or client"
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            summary={`${filtered.length} of ${data.length} projects`}
+            view={view}
+            onViewChange={changeView}
+            extra={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!groupKeys.length}
+                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groupKeys))}
+              >
+                {allCollapsed ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronsDownUp className="h-4 w-4" />}
+                {allCollapsed ? 'Expand all' : 'Collapse all'}
+              </Button>
+            }
+          />
 
-                <div className="mt-2">
-                  <Badge variant={item.status === 'active' ? 'success' : 'muted'}>
-                    {item.status}
-                  </Badge>
-                </div>
-
-                {item.description && (
-                  <p className="mt-3 text-sm text-muted-foreground line-clamp-2">
-                    {item.description}
-                  </p>
-                )}
-
-                <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1">
-                    <Calendar className="h-3 w-3" />
-                    Deadline {formatDate(item.deadline)}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1">
-                    <Users className="h-3 w-3" />
-                    {item.employees?.length ?? 0} members
-                  </span>
-                  <Badge variant="secondary">{item.tasks_count ?? 0} tasks</Badge>
-                </div>
-
-                {!!item.departments?.length && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {item.departments.map((d) => (
-                      <Badge key={d.id} variant="outline">
-                        {d.department}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-4 pt-3 border-t border-border">
-                  <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link to={`${basePath}/projects/${item.id}`}>
-                      <Columns3 className="h-4 w-4" />
-                      Open Kanban Board
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          {!filtered.length ? (
+            <EmptyState
+              icon={Search}
+              title="No matching projects"
+              description="Try a different search or status filter."
+            />
+          ) : (
+            <ProjectsByClient
+              projects={filtered}
+              view={view}
+              collapsed={collapsed}
+              onToggleGroup={toggleGroup}
+              boardHref={(p) => `${basePath}/projects/${p.id}`}
+              onEdit={openEdit}
+              onToggle={(p) => toggle.mutate(p.id)}
+            />
+          )}
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
