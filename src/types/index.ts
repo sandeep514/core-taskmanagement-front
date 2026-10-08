@@ -369,6 +369,18 @@ export function isTopToday(task: {
   return raw === todayKey()
 }
 
+/**
+ * True when the task was a Top task on a previous day — it can never be
+ * marked again. Same-day unmark + re-mark stays allowed.
+ */
+export function wasMarkedTopBefore(task: {
+  is_top_task?: boolean | null
+  top_task_date?: string | null
+}): boolean {
+  const raw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
+  return raw !== '' && raw !== todayKey()
+}
+
 /** Count of today's Top tasks in a list. */
 export function countTopToday<T extends { is_top_task?: boolean | null; top_task_date?: string | null }>(
   tasks: T[],

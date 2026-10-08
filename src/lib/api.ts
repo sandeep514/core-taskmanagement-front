@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ATTACHMENT_TOO_LARGE_MESSAGE, MAX_ATTACHMENT_BYTES } from '@/lib/api-error'
 import type {
   ActivityLogListResponse,
   AuthUser,
@@ -774,9 +775,61 @@ export async function reorderTaskSubtasks(
 }
 
 export async function addTaskAttachment(taskId: number, file: File): Promise<void> {
+  const payload = await maybeCompressImage(file)
+  if (payload.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(ATTACHMENT_TOO_LARGE_MESSAGE)
+  }
   const form = new FormData()
-  form.append('file', file)
+  form.append('file', payload)
   await api.post(`/${portalBase()}/tasks/${taskId}/attachments`, form)
+}
+
+/**
+ * Production nginx caps request bodies at ~1 MB, so phone photos and
+ * screenshots (often 2–8 MB) are rejected with 413. Downscale + recompress
+ * large JPEG/PNG/WebP images to fit. Anything else passes through untouched.
+ * Never throws — falls back to the original file on any failure.
+ */
+const COMPRESSED_IMAGE_MAX_BYTES = 950 * 1024
+const COMPRESSIBLE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+async function maybeCompressImage(file: File): Promise<File> {
+  if (!COMPRESSIBLE_IMAGE_TYPES.includes(file.type) || file.size <= COMPRESSED_IMAGE_MAX_BYTES) {
+    return file
+  }
+  try {
+    const bitmap = await createImageBitmap(file)
+    try {
+      let scale = Math.min(1, 1920 / Math.max(bitmap.width, bitmap.height))
+      let quality = 0.82
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const w = Math.max(1, Math.round(bitmap.width * scale))
+        const h = Math.max(1, Math.round(bitmap.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) break
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, w, h)
+        ctx.drawImage(bitmap, 0, 0, w, h)
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, 'image/jpeg', quality),
+        )
+        if (blob && blob.size <= COMPRESSED_IMAGE_MAX_BYTES) {
+          const name = file.name.replace(/\.(png|webp)$/i, '.jpg')
+          return new File([blob], name, { type: 'image/jpeg' })
+        }
+        scale *= 0.7
+        quality = Math.max(0.55, quality - 0.12)
+      }
+    } finally {
+      bitmap.close()
+    }
+  } catch {
+    // fall through to the original file
+  }
+  return file
 }
 
 /**

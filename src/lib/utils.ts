@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { canMarkTopTask, isTopToday } from '@/types'
+import { canMarkTopTask, isTopToday, wasMarkedTopBefore } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -288,6 +288,8 @@ export function canToggleTopTask(
   if (!user) return false
   const top = isTopToday(task)
   if (!canMarkTopTask(task) && !top) return false
+  // Tasks marked on a previous day can never be marked again.
+  if (wasMarkedTopBefore(task)) return false
   if (user.role === 'admin' || user.role === 'hr') return true
   return isTaskAssignedToUser(task, user.id, user.role)
 }

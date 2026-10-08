@@ -4,6 +4,9 @@ import axios from 'axios'
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 export const MAX_ATTACHMENT_LABEL = '10 MB'
 export const ATTACHMENT_TOO_LARGE_MESSAGE = `File exceeds the ${MAX_ATTACHMENT_LABEL} limit.`
+/** Production nginx caps bodies at ~1 MB, below Laravel's 10 MB rule. */
+export const SERVER_LIMIT_MESSAGE =
+  'The server rejected this file as too large. Please try a smaller file.'
 
 /** Extract a user-friendly message from Laravel / Axios errors. */
 export function getApiError(error: unknown, fallback = 'Something went wrong'): string {
@@ -14,7 +17,7 @@ export function getApiError(error: unknown, fallback = 'Something went wrong'): 
 
   // nginx / reverse-proxy rejects body before Laravel (often oversized uploads)
   if (error.response?.status === 413) {
-    return ATTACHMENT_TOO_LARGE_MESSAGE
+    return SERVER_LIMIT_MESSAGE
   }
 
   const data = error.response?.data as
