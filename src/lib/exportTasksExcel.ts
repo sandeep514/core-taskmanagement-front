@@ -23,7 +23,7 @@ export type ExportColumnKey =
   | 'estimate_start_date'
   | 'estimate_end_date'
   | 'deadline'
-  | 'estimate_hours'
+  | 'estimate_minutes'
   | 'actual_complete_on'
   | 'attachments_count'
   | 'comments_count'
@@ -53,7 +53,7 @@ export const EXPORT_COLUMNS: ExportColumnDef[] = [
   { key: 'estimate_start_date', label: 'Estimate Start Date', defaultSelected: true },
   { key: 'estimate_end_date', label: 'Estimate End Date', defaultSelected: true },
   { key: 'deadline', label: 'Deadline', defaultSelected: true },
-  { key: 'estimate_hours', label: 'Estimate (Hours)', defaultSelected: true },
+  { key: 'estimate_minutes', label: 'Estimate (Minutes)', defaultSelected: true },
   { key: 'actual_complete_on', label: 'Completed On', defaultSelected: true },
   { key: 'attachments_count', label: 'Attachments', defaultSelected: false },
   { key: 'comments_count', label: 'Comments', defaultSelected: false },
@@ -119,8 +119,8 @@ function cellValue(task: Task, key: ExportColumnKey): string | number {
       return formatDate(task.estimate_end_date)
     case 'deadline':
       return formatDate(task.deadline)
-    case 'estimate_hours':
-      return task.estimate_hours ?? ''
+    case 'estimate_minutes':
+      return task.estimate_minutes ?? ''
     case 'actual_complete_on':
       return formatDate(task.actual_complete_on)
     case 'attachments_count':

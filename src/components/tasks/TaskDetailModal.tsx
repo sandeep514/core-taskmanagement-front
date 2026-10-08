@@ -345,10 +345,10 @@ export function TaskDetailModal({
                         {overdue && ' · Overdue'}
                       </span>
                     )}
-                    {task.estimate_hours != null && task.estimate_hours !== undefined && (
+                    {task.estimate_minutes != null && task.estimate_minutes !== undefined && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
                         <Clock className="h-3 w-3" />
-                        {task.estimate_hours}h estimate
+                        {task.estimate_minutes}m estimate
                       </span>
                     )}
                   </div>

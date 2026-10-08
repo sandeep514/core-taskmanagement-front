@@ -171,16 +171,16 @@ export function isTaskCreator(
 }
 
 /**
- * Estimate end date from start + hours using 8-hour workdays.
- * 8h → same day, 16h → next day, etc.
+ * Estimate end date from start + minutes using 8-hour (480-minute) workdays.
+ * Up to 480 min → same day, 960 min → next day, etc.
  */
 export function computeEstimateEndDate(
   startDate: string,
-  hours: number,
+  minutes: number,
 ): string | null {
   const d = parseDate(startDate)
-  if (!d || !Number.isFinite(hours) || hours <= 0) return null
-  const workDays = Math.max(1, Math.ceil(hours / 8))
+  if (!d || !Number.isFinite(minutes) || minutes <= 0) return null
+  const workDays = Math.max(1, Math.ceil(minutes / 480))
   d.setDate(d.getDate() + workDays - 1)
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')

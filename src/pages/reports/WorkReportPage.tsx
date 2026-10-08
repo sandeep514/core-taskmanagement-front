@@ -202,10 +202,10 @@ export function WorkReportPage() {
             />
             <SummaryCard
               icon={Clock3}
-              label="Estimate hours"
-              value={data.summary.estimate_hours_total}
+              label="Estimate minutes"
+              value={data.summary.estimate_minutes_total}
               color="bg-sky-50 text-sky-700"
-              suffix="h"
+              suffix="m"
             />
             <SummaryCard
               icon={Users}
@@ -236,7 +236,7 @@ export function WorkReportPage() {
                         <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="py-2 pr-2 font-medium">Employee</th>
                           <th className="py-2 px-2 font-medium text-right">Tasks</th>
-                          <th className="py-2 pl-2 font-medium text-right">Hours</th>
+                          <th className="py-2 pl-2 font-medium text-right">Minutes</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -247,7 +247,7 @@ export function WorkReportPage() {
                               {row.tasks_done}
                             </td>
                             <td className="py-2.5 pl-2 text-right tabular-nums text-muted-foreground">
-                              {row.estimate_hours}
+                              {row.estimate_minutes}
                             </td>
                           </tr>
                         ))}
@@ -272,7 +272,7 @@ export function WorkReportPage() {
                         <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="py-2 pr-2 font-medium">Project</th>
                           <th className="py-2 px-2 font-medium text-right">Tasks</th>
-                          <th className="py-2 pl-2 font-medium text-right">Hours</th>
+                          <th className="py-2 pl-2 font-medium text-right">Minutes</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -283,7 +283,7 @@ export function WorkReportPage() {
                               {row.tasks_done}
                             </td>
                             <td className="py-2.5 pl-2 text-right tabular-nums text-muted-foreground">
-                              {row.estimate_hours}
+                              {row.estimate_minutes}
                             </td>
                           </tr>
                         ))}
@@ -323,7 +323,7 @@ export function WorkReportPage() {
                         <th className="px-4 py-3 font-medium">Status</th>
                         <th className="px-4 py-3 font-medium">Priority</th>
                         <th className="px-4 py-3 font-medium">Date</th>
-                        <th className="px-4 py-3 font-medium text-right">Hours</th>
+                        <th className="px-4 py-3 font-medium text-right">Minutes</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -377,7 +377,7 @@ export function WorkReportPage() {
                               {formatDate(task.actual_complete_on)}
                             </td>
                             <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                              {task.estimate_hours ?? '—'}
+                              {task.estimate_minutes ?? '—'}
                             </td>
                           </tr>
                         )

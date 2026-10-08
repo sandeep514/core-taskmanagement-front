@@ -54,7 +54,7 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   deadline: '',
   estimate_start_date: '',
   estimate_end_date: '',
-  estimate_hours: '',
+  estimate_minutes: '',
   assigned_to_ids: [],
   assigned_to_client: '',
   priority: 'medium',
@@ -63,21 +63,21 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   is_internal: false,
 })
 
-/** When hours are set, ensure start (default today) and auto-fill end date. */
+/** When minutes are set, ensure start (default today) and auto-fill end date. */
 function withAutoEstimateEnd(
   form: TaskFormData,
   patch: Partial<TaskFormData>,
 ): TaskFormData {
   const next = { ...form, ...patch }
-  const hours =
-    next.estimate_hours === '' || next.estimate_hours === undefined
+  const minutes =
+    next.estimate_minutes === '' || next.estimate_minutes === undefined
       ? null
-      : Number(next.estimate_hours)
+      : Number(next.estimate_minutes)
 
-  if (hours != null && !Number.isNaN(hours) && hours > 0) {
+  if (minutes != null && !Number.isNaN(minutes) && minutes > 0) {
     const start = next.estimate_start_date || todayDateString()
     next.estimate_start_date = start
-    const end = computeEstimateEndDate(start, hours)
+    const end = computeEstimateEndDate(start, minutes)
     if (end) next.estimate_end_date = end
   }
 
@@ -121,10 +121,10 @@ export function TaskFormModal({
         deadline: task.deadline || '',
         estimate_start_date: task.estimate_start_date || '',
         estimate_end_date: task.estimate_end_date || '',
-        estimate_hours:
-          task.estimate_hours === null || task.estimate_hours === undefined
+        estimate_minutes:
+          task.estimate_minutes === null || task.estimate_minutes === undefined
             ? ''
-            : task.estimate_hours,
+            : task.estimate_minutes,
         assigned_to_ids: taskAssigneeIds(task),
         assigned_to_client: task.assigned_to_client ?? '',
         priority: task.priority,
@@ -453,7 +453,7 @@ export function TaskFormModal({
             </div>
           </div>
 
-          {/* Estimate start / end / hours / deadline — one row on large screens */}
+          {/* Estimate start / end / minutes / deadline — one row on large screens */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Estimate start date</Label>
@@ -462,9 +462,9 @@ export function TaskFormModal({
                 value={form.estimate_start_date}
                 onChange={(e) => {
                   const start = e.target.value
-                  const hours =
-                    form.estimate_hours === '' ? null : Number(form.estimate_hours)
-                  if (start && hours != null && !Number.isNaN(hours) && hours > 0) {
+                  const minutes =
+                    form.estimate_minutes === '' ? null : Number(form.estimate_minutes)
+                  if (start && minutes != null && !Number.isNaN(minutes) && minutes > 0) {
                     setForm(
                       withAutoEstimateEnd(form, {
                         estimate_start_date: start,
@@ -487,27 +487,27 @@ export function TaskFormModal({
                 min={form.estimate_start_date || undefined}
               />
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Auto from hours (8h day); override OK
+                Auto from minutes (8h day); override OK
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label>Estimate (hours)</Label>
+              <Label>Estimate (minutes)</Label>
               <Input
                 type="number"
                 min={0}
-                step={0.5}
+                step={1}
                 inputMode="decimal"
-                placeholder="e.g. 4"
-                value={form.estimate_hours === '' ? '' : form.estimate_hours}
+                placeholder="e.g. 120"
+                value={form.estimate_minutes === '' ? '' : form.estimate_minutes}
                 onChange={(e) => {
                   const v = e.target.value
                   if (v === '') {
-                    setForm({ ...form, estimate_hours: '' })
+                    setForm({ ...form, estimate_minutes: '' })
                     return
                   }
                   setForm(
                     withAutoEstimateEnd(form, {
-                      estimate_hours: Number(v),
+                      estimate_minutes: Number(v),
                     }),
                   )
                 }}

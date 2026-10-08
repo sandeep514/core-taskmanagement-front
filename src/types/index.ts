@@ -201,10 +201,10 @@ export interface Task {
   deadline: string | null
   /** Estimated work start date (optional). */
   estimate_start_date: string | null
-  /** Estimated work end date (optional; often auto from hours). */
+  /** Estimated work end date (optional; often auto from minutes). */
   estimate_end_date: string | null
-  /** Estimated effort in hours (optional). */
-  estimate_hours: number | null
+  /** Estimated effort in minutes (optional). */
+  estimate_minutes: number | null
   actual_complete_on: string | null
   /** @deprecated Prefer assigned_to_ids / assignees */
   assigned_to: number | null
@@ -263,7 +263,7 @@ export interface WorkReportTaskRow {
   project_name: string
   priority: TaskPriority
   status: TaskStatus
-  estimate_hours: number | null
+  estimate_minutes: number | null
   actual_complete_on: string | null
   assignees: { id: number; name: string }[]
 }
@@ -272,14 +272,14 @@ export interface WorkReportEmployeeRow {
   employee_id: number
   employee_name: string
   tasks_done: number
-  estimate_hours: number
+  estimate_minutes: number
 }
 
 export interface WorkReportProjectRow {
   project_id: number
   project_name: string
   tasks_done: number
-  estimate_hours: number
+  estimate_minutes: number
 }
 
 export interface WorkReport {
@@ -288,7 +288,7 @@ export interface WorkReport {
   employee_id: number | null
   summary: {
     tasks_done: number
-    estimate_hours_total: number
+    estimate_minutes_total: number
     employees_count: number
     projects_count: number
   }
@@ -412,10 +412,10 @@ export interface TaskFormData {
   deadline: string
   /** Estimated start date (YYYY-MM-DD) or empty. */
   estimate_start_date: string
-  /** Estimated end date (YYYY-MM-DD) or empty; auto-filled from hours when possible. */
+  /** Estimated end date (YYYY-MM-DD) or empty; auto-filled from minutes when possible. */
   estimate_end_date: string
   /** Empty string when unset in the form; API receives number | null. */
-  estimate_hours: number | ''
+  estimate_minutes: number | ''
   assigned_to_ids: number[]
   assigned_to_client: number | ''
   priority: TaskPriority

@@ -114,9 +114,9 @@ function emptyToNull(value: string | number | null | undefined): string | number
 
 function normalizeTaskPayload(payload: Partial<TaskFormData>) {
   const estimate =
-    payload.estimate_hours === '' || payload.estimate_hours === undefined
+    payload.estimate_minutes === '' || payload.estimate_minutes === undefined
       ? null
-      : Number(payload.estimate_hours)
+      : Number(payload.estimate_minutes)
 
   return {
     title: payload.title,
@@ -124,7 +124,7 @@ function normalizeTaskPayload(payload: Partial<TaskFormData>) {
     deadline: emptyToNull(payload.deadline ?? '') as string | null,
     estimate_start_date: emptyToNull(payload.estimate_start_date ?? '') as string | null,
     estimate_end_date: emptyToNull(payload.estimate_end_date ?? '') as string | null,
-    estimate_hours:
+    estimate_minutes:
       estimate === null || Number.isNaN(estimate) ? null : estimate,
     assigned_to_ids: Array.isArray(payload.assigned_to_ids)
       ? payload.assigned_to_ids.map(Number)
