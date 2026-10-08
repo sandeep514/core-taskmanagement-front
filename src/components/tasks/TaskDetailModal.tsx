@@ -31,7 +31,7 @@ import {
   toggleTaskTop,
 } from '@/lib/api'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, isTopToday, wasMarkedTopBefore } from '@/types'
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i
 
@@ -188,8 +188,13 @@ export function TaskDetailModal({
 
   const topToday = task ? isTopToday(task) : false
   // Top-marking is only offered on the viewer's own assigned tasks outside
-  // todo / discussion (admin / HR exempt).
+  // todo / discussion (admin / HR exempt). Tasks marked on a previous day
+  // keep a locked label showing when they were marked.
   const canShowTopButton = task ? canToggleTopTask(task, user) : false
+  const markedBeforeLabel =
+    task && !canShowTopButton && wasMarkedTopBefore(task)
+      ? `Marked as Top on ${formatDate(task.top_task_date)}`
+      : null
 
   const priority = TASK_PRIORITIES.find((p) => p.value === task?.priority)
   const status = TASK_STATUSES.find((s) => s.value === task?.status)
@@ -232,6 +237,17 @@ export function TaskDetailModal({
                     >
                       <Star className="h-3.5 w-3.5" fill={topToday ? 'currentColor' : 'none'} />
                       {topToday ? 'Top task' : 'Mark Top 3'}
+                    </Button>
+                    ) : markedBeforeLabel ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                      className="text-amber-600 border-amber-200 bg-amber-50 cursor-default opacity-100"
+                      title={markedBeforeLabel}
+                    >
+                      <Star className="h-3.5 w-3.5" fill="currentColor" />
+                      {markedBeforeLabel}
                     </Button>
                     ) : null}
                     <Button

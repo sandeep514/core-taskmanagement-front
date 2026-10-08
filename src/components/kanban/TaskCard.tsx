@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, Star, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_TYPES, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_TYPES, isTopToday, wasMarkedTopBefore } from '@/types'
 import { toggleTaskTop } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import {
@@ -28,9 +28,28 @@ export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' |
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const top = isTopToday(task)
+  const markedBefore = wasMarkedTopBefore(task)
   // Never offer Top-marking on unassigned / todo / discussion tasks, and only
-  // on the viewer's own assigned tasks (admin / HR exempt).
-  if (!canToggleTopTask(task, user)) return null
+  // on the viewer's own assigned tasks (admin / HR exempt). Tasks marked on a
+  // previous day keep a locked star showing when they were marked.
+  if (!canToggleTopTask(task, user)) {
+    if (!markedBefore) return null
+    const markedLabel = `Marked as Top on ${formatDate(task.top_task_date)}`
+    return (
+      <span
+        title={markedLabel}
+        aria-label={markedLabel}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          'shrink-0 rounded-md p-1 text-amber-400 cursor-default',
+          size === 'xs' ? 'h-6 w-6 flex items-center justify-center' : 'h-7 w-7 flex items-center justify-center',
+        )}
+      >
+        <Star className={size === 'xs' ? 'h-3.5 w-3.5' : 'h-4 w-4'} fill="currentColor" />
+      </span>
+    )
+  }
   const mutation = useMutation({
     mutationFn: () => toggleTaskTop(task.id),
     onSuccess: () => {
