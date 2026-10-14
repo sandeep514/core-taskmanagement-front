@@ -2,8 +2,6 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Activity,
   BarChart3,
-  Briefcase,
-  Building2,
   ChevronLeft,
   ChevronRight,
   FolderKanban,
@@ -13,10 +11,6 @@ import {
   Menu,
   Settings,
   Star,
-  Users,
-  BadgeCheck,
-  UserCheck,
-  UserCog,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -28,18 +22,13 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
 /**
- * EA portal shell. Mirrors the admin portal navigation; every write to a
- * previous entry is blocked (read + create only — enforced by the API).
+ * EA portal shell. Masters (designations, departments, clients, employees)
+ * and account lists (HR, EA) are not part of the EA role — projects, tasks,
+ * reports, todos and settings only.
  */
 const nav = [
   { to: '/ea', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/ea/todos', label: 'My Todos', icon: ListTodo },
-  { to: '/ea/designations', label: 'Designations', icon: BadgeCheck },
-  { to: '/ea/departments', label: 'Departments', icon: Building2 },
-  { to: '/ea/clients', label: 'Clients', icon: Briefcase },
-  { to: '/ea/employees', label: 'Employees', icon: Users },
-  { to: '/ea/hrs', label: 'HR Accounts', icon: UserCog },
-  { to: '/ea/eas', label: 'EA Accounts', icon: UserCheck },
   { to: '/ea/projects', label: 'Projects', icon: FolderKanban },
   { to: '/ea/top-tasks', label: 'Top Tasks', icon: Star },
   { to: '/ea/activity-logs', label: 'Activity Logs', icon: Activity },

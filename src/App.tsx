@@ -90,12 +90,6 @@ export default function App() {
               <Route path="/ea" element={<EaLayout />}>
                 <Route index element={<DashboardPage />} />
                 <Route path="todos" element={<PersonalTodosPage />} />
-                <Route path="designations" element={<DesignationsPage />} />
-                <Route path="departments" element={<DepartmentsPage />} />
-                <Route path="clients" element={<ClientsPage />} />
-                <Route path="employees" element={<EmployeesPage />} />
-                <Route path="hrs" element={<HrsPage />} />
-                <Route path="eas" element={<EasPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
                 <Route path="top-tasks" element={<TopTasksReportPage />} />

@@ -13,6 +13,7 @@ import {
   updateProject,
 } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
+import { canManageRecords } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { Project, ProjectFormData } from '@/types'
 import { PageHeader } from '@/components/ui/page-header'
@@ -60,6 +61,10 @@ export function ProjectsPage() {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const basePath = portalUiBase(user?.role)
+  // EA has no masters access (project form needs client/department/employee
+  // lists), so the project list is read-only for EA — tasks are managed
+  // from the board.
+  const canManage = canManageRecords(user)
   const { data, isLoading } = useQuery({ queryKey: ['projects'], queryFn: fetchProjects })
   const { data: clients } = useQuery({ queryKey: ['clients'], queryFn: fetchClients })
   const { data: departments } = useQuery({ queryKey: ['departments'], queryFn: fetchDepartments })
@@ -146,12 +151,18 @@ export function ProjectsPage() {
     <div>
       <PageHeader
         title="Projects"
-        description="Create projects, assign clients, departments, and employees"
+        description={
+          canManage
+            ? 'Create projects, assign clients, departments, and employees'
+            : 'Projects — open a board to manage tasks'
+        }
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
+          canManage ? (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              New Project
+            </Button>
+          ) : undefined
         }
       />
 
@@ -159,12 +170,18 @@ export function ProjectsPage() {
         <EmptyState
           icon={FolderKanban}
           title="No projects yet"
-          description="Create a project and assign team members to get started."
+          description={
+            canManage
+              ? 'Create a project and assign team members to get started.'
+              : 'No projects assigned yet.'
+          }
           action={
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              New Project
-            </Button>
+            canManage ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                New Project
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -212,6 +229,7 @@ export function ProjectsPage() {
         </>
       )}
 
+      {canManage && (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
@@ -339,6 +357,7 @@ export function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   )
 }
