@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { canMarkTopTask, isTopToday, wasMarkedTopBefore } from '@/types'
+import { allowedTopDates, canMarkTopTask, isTopOnDate } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -270,7 +270,8 @@ export function isClientAssignedTask(task: {
 /**
  * Whether the current user may toggle the Top star on this task:
  * only their own assigned tasks (admin / HR may toggle any task).
- * Already-marked tasks stay toggleable so today's mark can be removed.
+ * Tasks marked for today or the last working date stay toggleable so the
+ * mark can be removed / re-marked; tasks with older history stay locked.
  */
 export function canToggleTopTask(
   task: {
@@ -286,10 +287,41 @@ export function canToggleTopTask(
   user: { id: number; role?: string } | null | undefined,
 ): boolean {
   if (!user) return false
-  const top = isTopToday(task)
-  if (!canMarkTopTask(task) && !top) return false
-  // Tasks marked on a previous day can never be marked again.
-  if (wasMarkedTopBefore(task)) return false
+  const raw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
+  const [today, lastDate] = allowedTopDates()
+  // History on any other day locks the task forever.
+  if (raw !== '' && raw !== today && raw !== lastDate) return false
+  const topToday = isTopOnDate(task, today)
+  const topLast = isTopOnDate(task, lastDate)
+  if (!canMarkTopTask(task) && !topToday && !topLast) return false
+  if (user.role === 'admin' || user.role === 'hr') return true
+  return isTaskAssignedToUser(task, user.id, user.role)
+}
+
+/**
+ * Whether the user may mark this task for an explicit Top date (today or the
+ * last working date). Same-date re-mark after unmark stays allowed; any other
+ * history locks the task.
+ */
+export function canMarkTopForDate(
+  task: {
+    status?: string | null
+    is_top_task?: boolean | null
+    top_task_date?: string | null
+    assigned_to_ids?: number[] | null
+    assignees?: { id: number }[] | null
+    assigned_to?: number | null
+    assigned_to_client?: number | null
+    client_assignee?: { id: number } | null
+  },
+  user: { id: number; role?: string } | null | undefined,
+  date: string,
+): boolean {
+  if (!user) return false
+  const raw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
+  if (raw !== '' && raw !== date) return false
+  if (isTopOnDate(task, date)) return true // already marked → unmark allowed
+  if (!canMarkTopTask(task)) return false
   if (user.role === 'admin' || user.role === 'hr') return true
   return isTaskAssignedToUser(task, user.id, user.role)
 }

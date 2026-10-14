@@ -356,6 +356,37 @@ export function canMarkTopTask(task: {
 }
 
 /**
+ * Last working date for Top-task backfill (previous working day, skipping
+ * Sundays). Monday's last date is Saturday so Saturday's missed Top-3 can be
+ * marked on Monday; Tue–Sat fall back to yesterday; Sunday falls to Saturday.
+ */
+export function lastWorkingDateKey(d = new Date()): string {
+  const c = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  do {
+    c.setDate(c.getDate() - 1)
+  } while (c.getDay() === 0) // skip Sundays (weekly off)
+  return todayKey(c)
+}
+
+/** Dates a Top mark may target: [today, last working date]. */
+export function allowedTopDates(d = new Date()): [string, string] {
+  return [todayKey(d), lastWorkingDateKey(d)]
+}
+
+/** True when task is marked as a Top task for the given date. */
+export function isTopOnDate(
+  task: {
+    is_top_task?: boolean | null
+    top_task_date?: string | null
+  },
+  date: string,
+): boolean {
+  if (!task.is_top_task) return false
+  if (!task.top_task_date) return false
+  return String(task.top_task_date).slice(0, 10) === date
+}
+
+/**
  * True when task is marked as a Top task for today (daily reset via top_task_date).
  * Only today's marks count — previous dates never appear in Top lists/counts.
  */
@@ -363,22 +394,23 @@ export function isTopToday(task: {
   is_top_task?: boolean | null
   top_task_date?: string | null
 }): boolean {
-  if (!task.is_top_task) return false
-  if (!task.top_task_date) return false
-  const raw = String(task.top_task_date).slice(0, 10)
-  return raw === todayKey()
+  return isTopOnDate(task, todayKey())
 }
 
 /**
- * True when the task was a Top task on a previous day — it can never be
- * marked again. Same-day unmark + re-mark stays allowed.
+ * True when the task was a Top task on a different day than `target` — it can
+ * never be marked again. Same-date unmark + re-mark stays allowed.
+ * Defaults to comparing against today (previous behaviour).
  */
-export function wasMarkedTopBefore(task: {
-  is_top_task?: boolean | null
-  top_task_date?: string | null
-}): boolean {
+export function wasMarkedTopBefore(
+  task: {
+    is_top_task?: boolean | null
+    top_task_date?: string | null
+  },
+  target?: string,
+): boolean {
   const raw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
-  return raw !== '' && raw !== todayKey()
+  return raw !== '' && raw !== (target ?? todayKey())
 }
 
 /** Count of today's Top tasks in a list. */
@@ -386,6 +418,13 @@ export function countTopToday<T extends { is_top_task?: boolean | null; top_task
   tasks: T[],
 ): number {
   return tasks.filter(isTopToday).length
+}
+
+/** Count of Top tasks for an explicit date (today or backfilled last date). */
+export function countTopOnDate<
+  T extends { is_top_task?: boolean | null; top_task_date?: string | null },
+>(tasks: T[], date: string): number {
+  return tasks.filter((t) => isTopOnDate(t, date)).length
 }
 
 export interface LoginResponse {

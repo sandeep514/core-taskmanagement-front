@@ -1,15 +1,16 @@
-import { forwardRef } from 'react'
+import { forwardRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, Star, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_TYPES, isTopToday, wasMarkedTopBefore } from '@/types'
+import { TASK_PRIORITIES, TASK_TYPES, isTopOnDate, isTopToday, lastWorkingDateKey } from '@/types'
 import { toggleTaskTop } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import {
   cn,
+  canMarkTopForDate,
   formatDate,
   formatTaskAssignees,
   formatTaskCreatedAt,
@@ -22,18 +23,27 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { useAuthStore } from '@/stores/authStore'
+import { useMyTopStatus } from '@/hooks/useMyTopStatus'
+import { TopDateDialog } from '@/components/tasks/TopDateDialog'
 
-/** Star button to mark / unmark a task as Top for today. Stops card-open + drag. */
+/** Star button to mark / unmark a task as Top. Opens a date choice (last date + today) when marking. Stops card-open + drag. */
 export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' | 'xs' }) {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
-  const top = isTopToday(task)
-  const markedBefore = wasMarkedTopBefore(task)
+  const { data: topStatus } = useMyTopStatus()
+  const [dateOpen, setDateOpen] = useState(false)
+  const today = topStatus?.today
+  const lastDate = topStatus?.last_date
+  const topToday = today ? isTopOnDate(task, today) : isTopToday(task)
+  const topLast = lastDate ? isTopOnDate(task, lastDate) : false
+  const markedBeforeRaw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
+  // Locked history on any other day keeps the read-only star.
+  const lockedBefore =
+    markedBeforeRaw !== '' && markedBeforeRaw !== today && markedBeforeRaw !== lastDate
   // Never offer Top-marking on unassigned / todo / discussion tasks, and only
-  // on the viewer's own assigned tasks (admin / HR exempt). Tasks marked on a
-  // previous day keep a locked star showing when they were marked.
+  // on the viewer's own assigned tasks (admin / HR exempt).
   if (!canToggleTopTask(task, user)) {
-    if (!markedBefore) return null
+    if (!lockedBefore) return null
     const markedLabel = `Marked as Top on ${formatDate(task.top_task_date)}`
     return (
       <span
@@ -50,39 +60,82 @@ export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' |
       </span>
     )
   }
+  const invalidateTop = () => {
+    qc.invalidateQueries({ queryKey: ['project-tasks'] })
+    qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+    qc.invalidateQueries({ queryKey: ['my-top-status'] })
+    qc.invalidateQueries({ queryKey: ['task'] })
+    qc.invalidateQueries({ queryKey: ['top-tasks'] })
+  }
   const mutation = useMutation({
-    mutationFn: () => toggleTaskTop(task.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project-tasks'] })
-      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
-      qc.invalidateQueries({ queryKey: ['task'] })
+    mutationFn: (date?: string) =>
+      toggleTaskTop(
+        task.id,
+        topToday || topLast ? false : true,
+        topToday || topLast ? (topToday ? today : lastDate) ?? undefined : date,
+      ),
+    onSuccess: (updated) => {
+      setDateOpen(false)
+      invalidateTop()
+      if (isTopToday(updated)) toast.success('Marked as Top task for today')
+      else if (lastDate && isTopOnDate(updated, lastDate))
+        toast.success(`Marked as Top task for ${formatDate(lastDate)}`)
+      else toast.success('Removed from Top tasks')
     },
     onError: (err) => toast.error(getApiError(err, 'Could not update Top task')),
   })
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    // Unmark directly — no date question needed.
+    if (topToday || topLast) {
+      mutation.mutate(undefined)
+      return
+    }
+    // Marking: ask for last date + today when backfill is still open for this
+    // task; otherwise mark today directly.
+    const canBackfill =
+      Boolean(lastDate) &&
+      Boolean(topStatus?.last_eligible) &&
+      canMarkTopForDate(task, user, lastDate!)
+    if (canBackfill && today) {
+      setDateOpen(true)
+      return
+    }
+    mutation.mutate(today)
+  }
+
   return (
-    <button
-      type="button"
-      title={top ? 'Remove from Top tasks for today' : 'Mark as Top task for today'}
-      aria-label={top ? 'Remove from Top tasks for today' : 'Mark as Top task for today'}
-      aria-pressed={top}
-      disabled={mutation.isPending}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation()
-        mutation.mutate()
-      }}
-      className={cn(
-        'shrink-0 rounded-md p-1 transition-colors',
-        size === 'xs' ? 'h-6 w-6 flex items-center justify-center' : 'h-7 w-7 flex items-center justify-center',
-        top
-          ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
-          : 'text-slate-300 hover:bg-slate-100 hover:text-amber-500',
-        mutation.isPending && 'opacity-50',
-      )}
-    >
-      <Star className={size === 'xs' ? 'h-3.5 w-3.5' : 'h-4 w-4'} fill={top ? 'currentColor' : 'none'} />
-    </button>
+    <>
+      <button
+        type="button"
+        title={topToday || topLast ? 'Remove from Top tasks' : 'Mark as Top task (choose date)'}
+        aria-label={topToday || topLast ? 'Remove from Top tasks' : 'Mark as Top task (choose date)'}
+        aria-pressed={topToday || topLast}
+        disabled={mutation.isPending}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={handleClick}
+        className={cn(
+          'shrink-0 rounded-md p-1 transition-colors',
+          size === 'xs' ? 'h-6 w-6 flex items-center justify-center' : 'h-7 w-7 flex items-center justify-center',
+          topToday || topLast
+            ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+            : 'text-slate-300 hover:bg-slate-100 hover:text-amber-500',
+          mutation.isPending && 'opacity-50',
+        )}
+      >
+        <Star className={size === 'xs' ? 'h-3.5 w-3.5' : 'h-4 w-4'} fill={topToday || topLast ? 'currentColor' : 'none'} />
+      </button>
+      <TopDateDialog
+        open={dateOpen}
+        onOpenChange={setDateOpen}
+        task={task}
+        status={topStatus}
+        defaultDate={today}
+        pending={mutation.isPending}
+        onConfirm={(date) => mutation.mutate(date)}
+      />
+    </>
   )
 }
 interface TaskCardContentProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -103,6 +156,8 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
     const overdue = isOverdue(task.deadline, task.status)
     const clientAssigned = isClientAssignedTask(task)
     const topToday = isTopToday(task)
+    const topLast = isTopOnDate(task, lastWorkingDateKey())
+    const topAny = topToday || topLast
 
     return (
       <div
@@ -118,7 +173,7 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
               ? 'hover:shadow-md cursor-pointer'
               : 'hover:shadow-md cursor-grab active:cursor-grabbing'),
           overdue && 'border-l-4 border-l-red-500',
-          !overdue && topToday && 'border-amber-300 ring-1 ring-amber-200',
+          !overdue && topAny && 'border-amber-300 ring-1 ring-amber-200',
           clientAssigned && !overdue && 'border-l-4 border-l-violet-500',
           clientAssigned && 'bg-violet-50/80 border-violet-200 ring-1 ring-violet-100',
           className,
@@ -142,6 +197,12 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
               <Star className="h-3 w-3" fill="currentColor" />
               Top 3
+            </span>
+          )}
+          {topLast && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800">
+              <Star className="h-3 w-3" fill="currentColor" />
+              Top · {formatDate(task.top_task_date)}
             </span>
           )}
           {task.is_internal && (

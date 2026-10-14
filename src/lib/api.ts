@@ -600,12 +600,36 @@ export async function updateTaskStatus(taskId: number, status: TaskStatus): Prom
   return data
 }
 
-/** Mark / unmark a task as Top task for today. Pass explicit value or omit to toggle. */
-export async function toggleTaskTop(taskId: number, is_top_task?: boolean): Promise<Task> {
-  const { data } = await api.patch<Task>(
-    `/${portalBase()}/tasks/${taskId}/top`,
-    is_top_task === undefined ? {} : { is_top_task },
-  )
+/** Mark / unmark a task as Top for today or the last working date (backfill). Pass explicit value or omit to toggle. */
+export async function toggleTaskTop(
+  taskId: number,
+  is_top_task?: boolean,
+  top_task_date?: string | null,
+): Promise<Task> {
+  const { data } = await api.patch<Task>(`/${portalBase()}/tasks/${taskId}/top`, {
+    ...(is_top_task === undefined ? {} : { is_top_task }),
+    ...(top_task_date ? { top_task_date } : {}),
+  })
+  return data
+}
+
+export interface MyTopStatus {
+  today: string
+  last_date: string
+  min_required: number
+  today_count: number
+  last_count: number
+  /** True while the last date's Top set is still incomplete (< min). */
+  last_eligible: boolean
+}
+
+/**
+ * Current user's Top compliance for today + last working date (employee /
+ * client portals). The last date is only offered while its Top-3 set is
+ * incomplete — callers hide the "last date" option otherwise.
+ */
+export async function fetchMyTopStatus(): Promise<MyTopStatus> {
+  const { data } = await api.get<MyTopStatus>(`/${portalBase()}/my-top-status`)
   return data
 }
 

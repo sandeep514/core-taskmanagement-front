@@ -31,7 +31,7 @@ import {
   toggleTaskTop,
 } from '@/lib/api'
 import type { Task } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, isTopToday, wasMarkedTopBefore } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, isTopOnDate, isTopToday } from '@/types'
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|avif|heic|heif)$/i
 
@@ -49,6 +49,7 @@ function isImageAttachment(a: {
 import {
   canDeleteTaskAttachment,
   canEditTask,
+  canMarkTopForDate,
   canToggleTopTask,
   cn,
   formatDate,
@@ -59,6 +60,8 @@ import {
   isClientAssignedTask,
   isOverdue,
 } from '@/lib/utils'
+import { useMyTopStatus } from '@/hooks/useMyTopStatus'
+import { TopDateDialog } from '@/components/tasks/TopDateDialog'
 import {
   getApiError,
   MAX_ATTACHMENT_BYTES,
@@ -107,6 +110,8 @@ export function TaskDetailModal({
     file_name: string
   } | null>(null)
   const [deleteRemark, setDeleteRemark] = useState('')
+  const [dateOpen, setDateOpen] = useState(false)
+  const { data: topStatus } = useMyTopStatus()
   const [imagePreview, setImagePreview] = useState<{
     url: string
     file_name: string
@@ -175,26 +180,62 @@ export function TaskDetailModal({
   })
 
   const topMutation = useMutation({
-    mutationFn: () => toggleTaskTop(taskId!),
+    mutationFn: (date?: string) => {
+      const today = topStatus?.today
+      const lastDate = topStatus?.last_date
+      const markedToday = today ? isTopOnDate(task!, today) : isTopToday(task!)
+      const markedLast = lastDate ? isTopOnDate(task!, lastDate) : false
+      const unmarking = markedToday || markedLast
+      return toggleTaskTop(
+        taskId!,
+        unmarking ? false : true,
+        unmarking ? (markedToday ? today : lastDate) ?? undefined : date,
+      )
+    },
     onSuccess: (updated) => {
       qc.setQueryData(['task', taskId], updated)
       invalidateTaskQueries()
-      toast.success(
-        isTopToday(updated) ? 'Marked as Top task for today' : 'Removed from Top tasks',
-      )
+      qc.invalidateQueries({ queryKey: ['my-top-status'] })
+      setDateOpen(false)
+      if (isTopToday(updated)) toast.success('Marked as Top task for today')
+      else if (topStatus?.last_date && isTopOnDate(updated, topStatus.last_date))
+        toast.success(`Marked as Top task for ${formatDate(topStatus.last_date)}`)
+      else toast.success('Removed from Top tasks')
     },
     onError: (err) => toast.error(getApiError(err, 'Could not update Top task')),
   })
 
-  const topToday = task ? isTopToday(task) : false
+  const todayKeyVal = topStatus?.today
+  const lastDateVal = topStatus?.last_date
+  const topToday = task && todayKeyVal ? isTopOnDate(task, todayKeyVal) : task ? isTopToday(task) : false
+  const topLast = task && lastDateVal ? isTopOnDate(task, lastDateVal) : false
+  const isMarked = topToday || topLast
   // Top-marking is only offered on the viewer's own assigned tasks outside
-  // todo / discussion (admin / HR exempt). Tasks marked on a previous day
-  // keep a locked label showing when they were marked.
+  // todo / discussion (admin / HR exempt). Older history keeps a locked label.
   const canShowTopButton = task ? canToggleTopTask(task, user) : false
+  const markedRaw = task?.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
+  const lockedHistory =
+    markedRaw !== '' && markedRaw !== todayKeyVal && markedRaw !== lastDateVal
   const markedBeforeLabel =
-    task && !canShowTopButton && wasMarkedTopBefore(task)
+    task && !canShowTopButton && lockedHistory
       ? `Marked as Top on ${formatDate(task.top_task_date)}`
       : null
+  const handleTopClick = () => {
+    if (!task) return
+    if (isMarked) {
+      topMutation.mutate(undefined)
+      return
+    }
+    const canBackfill =
+      Boolean(lastDateVal) &&
+      Boolean(topStatus?.last_eligible) &&
+      canMarkTopForDate(task, user, lastDateVal!)
+    if (canBackfill && todayKeyVal) {
+      setDateOpen(true)
+      return
+    }
+    topMutation.mutate(todayKeyVal)
+  }
 
   const priority = TASK_PRIORITIES.find((p) => p.value === task?.priority)
   const status = TASK_STATUSES.find((s) => s.value === task?.status)
@@ -226,17 +267,21 @@ export function TaskDetailModal({
                   <div className="flex flex-wrap gap-1 justify-end">
                     {canShowTopButton ? (
                     <Button
-                      variant={topToday ? 'default' : 'outline'}
+                      variant={isMarked ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => topMutation.mutate()}
+                      onClick={handleTopClick}
                       disabled={topMutation.isPending}
                       className={cn(
-                        topToday && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent',
+                        isMarked && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent',
                       )}
-                      title={topToday ? 'Remove from Top tasks for today' : 'Mark as Top task for today'}
+                      title={isMarked ? 'Remove from Top tasks' : 'Mark as Top task (choose date)'}
                     >
-                      <Star className="h-3.5 w-3.5" fill={topToday ? 'currentColor' : 'none'} />
-                      {topToday ? 'Top task' : 'Mark Top 3'}
+                      <Star className="h-3.5 w-3.5" fill={isMarked ? 'currentColor' : 'none'} />
+                      {topLast
+                        ? `Top · ${formatDate(lastDateVal)}`
+                        : topToday
+                          ? 'Top task'
+                          : 'Mark Top 3'}
                     </Button>
                     ) : markedBeforeLabel ? (
                     <Button
@@ -293,6 +338,12 @@ export function TaskDetailModal({
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
                         <Star className="h-3 w-3" fill="currentColor" />
                         Top task for today
+                      </span>
+                    )}
+                    {topLast && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">
+                        <Star className="h-3 w-3" fill="currentColor" />
+                        Top task for {formatDate(lastDateVal)}
                       </span>
                     )}
                     {task.is_internal && (
@@ -712,6 +763,16 @@ export function TaskDetailModal({
       onOpenChange={setCopyOpen}
       task={task ?? null}
       sourceProjectId={projectId}
+    />
+
+    <TopDateDialog
+      open={dateOpen}
+      onOpenChange={setDateOpen}
+      task={task ?? null}
+      status={topStatus}
+      defaultDate={todayKeyVal}
+      pending={topMutation.isPending}
+      onConfirm={(date) => topMutation.mutate(date)}
     />
 
     <Dialog

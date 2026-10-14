@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ListPlus, Plus } from 'lucide-react'
 import { fetchMyAssignedTasks, fetchProject, fetchProjectTasks } from '@/lib/api'
 import type { Task } from '@/types'
-import { countTopToday, isTopToday } from '@/types'
+import { countTopOnDate, countTopToday, isTopToday, lastWorkingDateKey } from '@/types'
 import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
@@ -71,6 +71,8 @@ export function ClientProjectBoardPage() {
   })
   const globalMyTopCount = countTopToday(myAssignedAll ?? [])
   const myTopInProject = countTopToday((myAssignedAll ?? []).filter((t) => t.project_id === id))
+  const lastDateKey = lastWorkingDateKey()
+  const globalMyTopLastCount = countTopOnDate(myAssignedAll ?? [], lastDateKey)
 
   if (loadingProject) return <PageLoader />
 
@@ -173,7 +175,7 @@ export function ClientProjectBoardPage() {
       </div>
 
       <div className="mb-4 max-w-md">
-        <TopTasksNudge marked={globalMyTopCount} projectMarked={myTopInProject} compact />
+        <TopTasksNudge marked={globalMyTopCount} projectMarked={myTopInProject} lastDate={lastDateKey} lastMarked={globalMyTopLastCount} compact />
       </div>
 
       <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} />

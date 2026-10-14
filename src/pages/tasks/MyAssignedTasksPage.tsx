@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { bulkDeactivateTasks, fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskStatus } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, countTopToday, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, countTopOnDate, countTopToday, isTopOnDate, isTopToday } from '@/types'
 import {
   allowedTaskStatusesForUser,
   canChangeTaskStatus,
@@ -17,6 +17,7 @@ import {
   isClientAssignedTask,
   isOverdue,
 } from '@/lib/utils'
+import { useMyTopStatus } from '@/hooks/useMyTopStatus'
 import { useAuthStore } from '@/stores/authStore'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -60,7 +61,13 @@ export function MyAssignedTasksPage() {
   const [taskTypeFilter, setTaskTypeFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const [topOnly, setTopOnly] = useState(false)
+  // Top-3 filter targets an explicit date (today or the last working date).
+  // Clicking the Top 3 pill asks for the date — last date is only offered
+  // while its 3-task set is still incomplete.
+  const [topFilterDate, setTopFilterDate] = useState<string | null>(null)
+  const [topDateOpen, setTopDateOpen] = useState(false)
+  const topOnly = topFilterDate !== null
+  const { data: topStatus } = useMyTopStatus()
 
   const [detailOpen, setDetailOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
@@ -134,22 +141,32 @@ export function MyAssignedTasksPage() {
       if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false
       if (taskTypeFilter !== 'all' && (task.task_type ?? 'general') !== taskTypeFilter) return false
       if (statusFilter !== 'all' && task.status !== statusFilter) return false
-      if (topOnly && !isTopToday(task)) return false
+      if (topFilterDate && !isTopOnDate(task, topFilterDate)) return false
       if (!matchesTaskSearch(task, search)) return false
       return true
     })
-  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter, search, topOnly])
+  }, [data, projectFilter, priorityFilter, taskTypeFilter, statusFilter, search, topFilterDate])
 
   const stats = useMemo(() => {
     const list = data ?? []
+    const todayKeyVal = topStatus?.today
+    const lastDateVal = topStatus?.last_date
+    // Server counts are the source of truth; fall back to local list counts.
+    const topTodayCount = topStatus ? topStatus.today_count : countTopToday(list)
+    const topLastCount = topStatus && lastDateVal ? topStatus.last_count : lastDateVal ? countTopOnDate(list, lastDateVal) : 0
+    void todayKeyVal
     return {
       total: list.length,
       open: list.filter((t) => t.status !== 'done').length,
       overdue: list.filter((t) => isOverdue(t.deadline, t.status)).length,
       urgent: list.filter((t) => t.priority === 'urgent' && t.status !== 'done').length,
-      topToday: countTopToday(list),
+      topToday: topTodayCount,
+      topLast: topLastCount,
+      lastDate: lastDateVal ?? null,
+      lastEligible: topStatus?.last_eligible ?? false,
+      minRequired: topStatus?.min_required ?? 3,
     }
-  }, [data])
+  }, [data, topStatus])
 
   const hasActiveFilters =
     projectFilter !== 'all' ||
@@ -165,7 +182,20 @@ export function MyAssignedTasksPage() {
     setTaskTypeFilter('all')
     setStatusFilter('all')
     setSearch('')
-    setTopOnly(false)
+    setTopFilterDate(null)
+  }
+
+  /** Clicking the Top 3 pill asks for the date: last date + today (last only while incomplete). */
+  const handleTopPillClick = () => {
+    if (topFilterDate) {
+      setTopFilterDate(null)
+      return
+    }
+    if (stats.lastEligible && stats.lastDate && topStatus?.today) {
+      setTopDateOpen(true)
+      return
+    }
+    setTopFilterDate(topStatus?.today ?? null)
   }
 
   const statusMutation = useMutation({
@@ -301,7 +331,12 @@ export function MyAssignedTasksPage() {
 
       <div className="mb-5 space-y-3">
         <div className="max-w-md">
-          <TopTasksNudge marked={stats.topToday} />
+          <TopTasksNudge
+            marked={stats.topToday}
+            min={stats.minRequired}
+            lastDate={stats.lastDate}
+            lastMarked={stats.topLast}
+          />
         </div>
         <div className="relative max-w-md">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -407,11 +442,18 @@ export function MyAssignedTasksPage() {
                 ? 'bg-amber-500 hover:bg-amber-600 text-white border-transparent'
                 : 'border-amber-200 text-amber-700 hover:bg-amber-50',
             )}
-            onClick={() => setTopOnly((v) => !v)}
+            onClick={handleTopPillClick}
             aria-pressed={topOnly}
+            title={
+              topFilterDate && stats.lastDate && topFilterDate === stats.lastDate
+                ? `Showing Top tasks for last date (${formatDate(stats.lastDate)}). Click to clear.`
+                : 'Show Top tasks (choose date)'
+            }
           >
             <Star className="h-3.5 w-3.5" fill={topOnly ? 'currentColor' : 'none'} />
-            Top 3 ({stats.topToday})
+            {topFilterDate && stats.lastDate && topFilterDate === stats.lastDate
+              ? `Top · ${formatDate(stats.lastDate)} (${stats.topLast})`
+              : `Top 3 (${stats.topToday})`}
           </Button>
         </div>
 
@@ -563,7 +605,7 @@ export function MyAssignedTasksPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-start gap-2">
-                            {isTopToday(task) && (
+                            {(isTopToday(task) || (stats.lastDate ? isTopOnDate(task, stats.lastDate) : false)) && (
                               <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
                                 <Star className="h-3 w-3" fill="currentColor" />
                                 Top
@@ -700,6 +742,62 @@ export function MyAssignedTasksPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={topDateOpen} onOpenChange={setTopDateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Top 3 — choose date</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <p className="text-sm text-muted-foreground">
+              Which day's Top tasks do you want to see?
+            </p>
+            {stats.lastEligible && stats.lastDate && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto w-full justify-start gap-3 px-3.5 py-3 text-left"
+                onClick={() => {
+                  setTopFilterDate(stats.lastDate)
+                  setTopDateOpen(false)
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">
+                    Last date — {formatDate(stats.lastDate)}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {stats.topLast}/{stats.minRequired} marked
+                  </span>
+                </span>
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto w-full justify-start gap-3 px-3.5 py-3 text-left"
+              onClick={() => {
+                if (topStatus?.today) setTopFilterDate(topStatus.today)
+                setTopDateOpen(false)
+              }}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">
+                  Today{topStatus?.today ? ` — ${formatDate(topStatus.today)}` : ''}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {stats.topToday}/{stats.minRequired} marked
+                </span>
+              </span>
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTopDateOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
         <DialogContent className="max-w-md">
