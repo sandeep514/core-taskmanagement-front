@@ -1,18 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Columns3, Pencil, Power } from 'lucide-react'
 import type { Project } from '@/types'
-import { Button } from '@/components/ui/button'
-
-interface Props {
-  project: Project
-  boardHref: string
-  onEdit: (p: Project) => void
-  onToggle: (p: Project) => void
-}
-
-import { Link } from 'react-router-dom'
-import { Columns3, Pencil, Power } from 'lucide-react'
-import type { Project } from '@/types'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 
