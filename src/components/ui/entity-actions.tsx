@@ -1,5 +1,6 @@
 import { Pencil, Power } from 'lucide-react'
 import type { EntityStatus } from '@/types'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -12,6 +13,9 @@ interface Props {
 }
 
 export function EntityActions({ name, status, onEdit, onToggle, disabled }: Props) {
+  // EA role is view + create only — never show edit/toggle on previous entries.
+  const role = useAuthStore((s) => s.user?.role)
+  if (role === 'ea') return null
   const active = status === 'active'
   return (
     <div className="flex justify-end gap-1">

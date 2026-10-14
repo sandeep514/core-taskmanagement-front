@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { createHr, fetchHrs, toggleHrStatus, updateHr } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { EntityStatus, HrUser } from '@/types'
+import { canManageRecords } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +43,9 @@ const empty = {
 
 export function HrsPage() {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  // EA callers see the list read-only (API blocks every EA write).
+  const canManage = canManageRecords(user)
   const { data, isLoading } = useQuery({ queryKey: ['hrs'], queryFn: fetchHrs })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<HrUser | null>(null)
@@ -99,12 +104,18 @@ export function HrsPage() {
     <div>
       <PageHeader
         title="HR Accounts"
-        description="Create and manage HR portal users who can handle clients, projects, and tasks"
+        description={
+          canManage
+            ? 'Create and manage HR portal users who can handle clients, projects, and tasks'
+            : 'HR portal users — read-only for the EA role'
+        }
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Add HR
-          </Button>
+          canManage ? (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              Add HR
+            </Button>
+          ) : undefined
         }
       />
 
@@ -112,12 +123,18 @@ export function HrsPage() {
         <EmptyState
           icon={UserCog}
           title="No HR accounts"
-          description="Add an HR user so they can sign in to the HR portal."
+          description={
+            canManage
+              ? 'Add an HR user so they can sign in to the HR portal.'
+              : 'No HR accounts yet.'
+          }
           action={
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              Add HR
-            </Button>
+            canManage ? (
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                Add HR
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -140,15 +157,19 @@ export function HrsPage() {
             ),
           }}
           columns={[{ header: 'Email', cell: (h) => <span className="block truncate max-w-xs">{h.email}</span> }]}
-          renderActions={(h) => (
-            <EntityActions
-              name={h.name}
-              status={h.status}
-              disabled={toggle.isPending}
-              onEdit={() => openEdit(h)}
-              onToggle={() => toggle.mutate(h.id)}
-            />
-          )}
+          renderActions={
+            canManage
+              ? (h) => (
+                  <EntityActions
+                    name={h.name}
+                    status={h.status}
+                    disabled={toggle.isPending}
+                    onEdit={() => openEdit(h)}
+                    onToggle={() => toggle.mutate(h.id)}
+                  />
+                )
+              : () => null
+          }
           renderCard={(h) => (
             <Card className="h-full">
               <CardContent className="p-4">
@@ -165,19 +186,23 @@ export function HrsPage() {
                   </div>
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(h)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggle.mutate(h.id)}
-                    disabled={toggle.isPending}
-                  >
-                    <Power className="h-3.5 w-3.5" />
-                    {h.status === 'active' ? 'Deactivate' : 'Activate'}
-                  </Button>
+                  {canManage && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(h)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggle.mutate(h.id)}
+                        disabled={toggle.isPending}
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                        {h.status === 'active' ? 'Deactivate' : 'Activate'}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -186,6 +211,7 @@ export function HrsPage() {
         />
       )}
 
+      {canManage && (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -247,6 +273,7 @@ export function HrsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   )
 }

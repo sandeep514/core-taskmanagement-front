@@ -13,6 +13,7 @@ import {
   Settings,
   Star,
   Users,
+  UserCheck,
   BadgeCheck,
   X,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ const nav = [
   { to: '/hr/departments', label: 'Departments', icon: Building2 },
   { to: '/hr/clients', label: 'Clients', icon: Briefcase },
   { to: '/hr/employees', label: 'Employees', icon: Users },
+  { to: '/hr/eas', label: 'EA Accounts', icon: UserCheck },
   { to: '/hr/projects', label: 'Projects', icon: FolderKanban },
   { to: '/hr/top-tasks', label: 'Top Tasks', icon: Star },
   { to: '/hr/activity-logs', label: 'Activity Logs', icon: Activity },

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'hr' | 'employee' | 'client'
+export type UserRole = 'admin' | 'hr' | 'ea' | 'employee' | 'client'
 
 export type TaskStatus =
   | 'todo'
@@ -115,7 +115,7 @@ export interface TaskComment {
   id: number
   task_id: number
   user_id: number
-  user_type: 'admin' | 'hr' | 'employee' | 'client'
+  user_type: 'admin' | 'hr' | 'ea' | 'employee' | 'client'
   comment: string
   user_name?: string
   created_at: string
@@ -126,7 +126,7 @@ export interface TaskActivityLog {
   id: number
   task_id: number
   user_id: number | null
-  user_type: 'admin' | 'hr' | 'employee' | 'client' | null
+  user_type: 'admin' | 'hr' | 'ea' | 'employee' | 'client' | null
   action: string
   from_value: string | null
   to_value: string | null
@@ -145,7 +145,7 @@ export interface ActivityLogEntry {
   project_id?: number | null
   project_name?: string | null
   user_id: number | null
-  user_type: 'admin' | 'hr' | 'employee' | 'client' | null
+  user_type: 'admin' | 'hr' | 'ea' | 'employee' | 'client' | null
   user_name?: string | null
   action: string
   from_value: string | null
@@ -175,6 +175,16 @@ export interface HrUser {
   updated_at: string
 }
 
+/** EA portal user managed by admin + HR (admin-level read + create, no edits). */
+export interface EaUser {
+  id: number
+  name: string
+  email: string
+  status: EntityStatus
+  created_at: string
+  updated_at: string
+}
+
 /** Checklist item that breaks a task into smaller steps. */
 export interface TaskSubtask {
   id: number
@@ -184,9 +194,9 @@ export interface TaskSubtask {
   completed_at: string | null
   position: number
   created_by: number | null
-  created_by_type?: 'admin' | 'hr' | 'employee' | 'client' | null
+  created_by_type?: 'admin' | 'hr' | 'ea' | 'employee' | 'client' | null
   completed_by: number | null
-  completed_by_type?: 'admin' | 'hr' | 'employee' | 'client' | null
+  completed_by_type?: 'admin' | 'hr' | 'ea' | 'employee' | 'client' | null
   completed_by_name?: string | null
   created_at: string
   updated_at: string
@@ -210,9 +220,11 @@ export interface Task {
   assigned_to: number | null
   assigned_to_ids?: number[]
   assigned_to_client?: number | null
+  /** EA assignees (ids from the API `assigned_to_ea_ids` append). */
+  assigned_to_ea_ids?: number[]
   created_by: number | null
   /** Who created the task: admin | hr | employee | client */
-  created_by_type?: 'admin' | 'hr' | 'employee' | 'client' | null
+  created_by_type?: 'admin' | 'hr' | 'ea' | 'employee' | 'client' | null
   /** Resolved display name from API (e.g. "Admin · Jane", "HR · Sam", "Client · Acme") */
   created_by_name?: string | null
   priority: TaskPriority
@@ -228,6 +240,8 @@ export interface Task {
   /** @deprecated Prefer assignees */
   assignee?: Employee | null
   assignees?: Employee[]
+  /** EA users assigned to this task. */
+  eas?: EaUser[]
   client_assignee?: Client | null
   creator?: Employee | null
   project?: Pick<Project, 'id' | 'project_name' | 'client_id'> | null
@@ -344,6 +358,8 @@ export function canMarkTopTask(task: {
   assignees?: { id: number }[] | null
   assigned_to?: number | null
   assigned_to_client?: number | null
+  assigned_to_ea_ids?: number[] | null
+  eas?: { id: number }[] | null
   client_assignee?: { id: number } | null
 }): boolean {
   if (task.status === 'todo' || task.status === 'discussion') return false
@@ -351,8 +367,9 @@ export function canMarkTopTask(task: {
     (task.assigned_to_ids?.length ?? 0) > 0 ||
     (task.assignees?.length ?? 0) > 0 ||
     task.assigned_to != null
+  const hasEa = (task.assigned_to_ea_ids?.length ?? 0) > 0 || (task.eas?.length ?? 0) > 0
   const hasClient = task.assigned_to_client != null || task.client_assignee != null
-  return hasEmployee || hasClient
+  return hasEmployee || hasClient || hasEa
 }
 
 /**
@@ -457,6 +474,8 @@ export interface TaskFormData {
   estimate_minutes: number | ''
   assigned_to_ids: number[]
   assigned_to_client: number | ''
+  /** EA assignees — exclusive of employees and client (one task per EA when many). */
+  assigned_to_ea_ids: number[]
   priority: TaskPriority
   task_type: TaskType
   status: TaskStatus

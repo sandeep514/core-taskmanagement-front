@@ -37,6 +37,7 @@ const USER_TYPES = [
   { value: 'default', label: 'Employee + HR (default)' },
   { value: 'employee', label: 'Employee only' },
   { value: 'hr', label: 'HR only' },
+  { value: 'ea', label: 'EA only' },
   { value: 'admin', label: 'Admin only' },
   { value: 'client', label: 'Client only' },
 ]
@@ -53,6 +54,8 @@ function typeBadge(type: string | null | undefined) {
   switch (type) {
     case 'hr':
       return 'bg-teal-50 text-teal-700 border-teal-200'
+    case 'ea':
+      return 'bg-violet-50 text-violet-700 border-violet-200'
     case 'employee':
       return 'bg-sky-50 text-sky-700 border-sky-200'
     case 'admin':
@@ -75,7 +78,7 @@ export function ActivityLogsPage() {
   const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
   const [applied, setApplied] = useState({
-    user_type: '' as '' | 'employee' | 'hr' | 'admin' | 'client',
+    user_type: '' as '' | 'employee' | 'hr' | 'ea' | 'admin' | 'client',
     action: '',
     project_id: null as number | null,
     from: '',
@@ -104,7 +107,7 @@ export function ActivityLogsPage() {
       user_type:
         userType === 'default'
           ? ''
-          : (userType as 'employee' | 'hr' | 'admin' | 'client'),
+          : (userType as 'employee' | 'hr' | 'ea' | 'admin' | 'client'),
       action: action === 'all' ? '' : action,
       project_id: projectId === 'all' ? null : Number(projectId),
       from,

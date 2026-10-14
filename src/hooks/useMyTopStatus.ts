@@ -35,7 +35,7 @@ export function useMyTopStatus() {
     retry: 1,
   })
 
-  if (role === 'admin' || role === 'hr') {
+  if (role === 'admin' || role === 'hr' || role === 'ea') {
     const f = localFallback()
     return {
       ...query,

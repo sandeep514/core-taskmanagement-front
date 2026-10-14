@@ -51,10 +51,12 @@ export function formatTaskCreatedAt(task: {
   return formatDate(task.task_created_on)
 }
 
-/** Display label for task assignees (employees and/or client). */
+/** Display label for task assignees (employees, EAs, and/or client). */
 export function formatTaskAssignees(task: {
   assignees?: { id: number; name: string }[] | null
   assignee?: { id: number; name: string } | null
+  eas?: { id: number; name: string }[] | null
+  assigned_to_ea_ids?: number[] | null
   client_assignee?: { id: number; name: string } | null
 }): string {
   if (task.client_assignee) return `Client · ${task.client_assignee.name}`
@@ -64,10 +66,17 @@ export function formatTaskAssignees(task: {
       : task.assignee
         ? [task.assignee]
         : []
-  if (!list.length) return 'Unassigned'
-  if (list.length === 1) return list[0].name
-  if (list.length === 2) return `${list[0].name} + ${list[1].name}`
-  return `${list[0].name} +${list.length - 1}`
+  if (list.length) {
+    if (list.length === 1) return list[0].name
+    if (list.length === 2) return `${list[0].name} + ${list[1].name}`
+    return `${list[0].name} +${list.length - 1}`
+  }
+  const eaList = task.eas ?? []
+  if (eaList.length === 1) return `EA · ${eaList[0].name}`
+  if (eaList.length === 2) return `EA · ${eaList[0].name} + ${eaList[1].name}`
+  if (eaList.length > 2) return `EA · ${eaList[0].name} +${eaList.length - 1}`
+  if ((task.assigned_to_ea_ids?.length ?? 0) > 0) return 'EA · assigned'
+  return 'Unassigned'
 }
 
 /** Display label for who created the task. */
@@ -79,6 +88,7 @@ export function formatTaskCreator(task: {
   if (task.created_by_name?.trim()) return task.created_by_name.trim()
   if (task.creator?.name?.trim()) return task.creator.name.trim()
   if (task.created_by_type === 'admin') return 'Admin'
+  if (task.created_by_type === 'ea') return 'EA'
   if (task.created_by_type === 'client') return 'Client'
   if (task.created_by_type === 'employee') return 'Employee'
   return '—'
@@ -95,22 +105,65 @@ export function taskAssigneeIds(task: {
   return []
 }
 
+export function taskEaAssigneeIds(task: {
+  assigned_to_ea_ids?: number[] | null
+  eas?: { id: number }[] | null
+}): number[] {
+  if (task.assigned_to_ea_ids?.length) return task.assigned_to_ea_ids
+  if (task.eas?.length) return task.eas.map((a) => a.id)
+  return []
+}
+
 export function isTaskAssignedToUser(
   task: {
     assigned_to_ids?: number[] | null
     assignees?: { id: number }[] | null
     assigned_to?: number | null
     assigned_to_client?: number | null
+    assigned_to_ea_ids?: number[] | null
+    eas?: { id: number }[] | null
   },
   userId: number,
   role?: string,
 ): boolean {
   if (role === 'client') return task.assigned_to_client === userId
+  if (role === 'ea') return taskEaAssigneeIds(task).includes(userId)
   return taskAssigneeIds(task).includes(userId)
+}
+
+/** True when the auth user created the task (EA's own created tasks are movable by her). */
+export function isOwnCreatedTask(
+  task: {
+    created_by?: number | null
+    created_by_type?: string | null
+  } | null | undefined,
+  user: { id: number; role?: string } | null | undefined,
+): boolean {
+  if (!user || !task) return false
+  if (task.created_by == null || !task.created_by_type) return false
+  return task.created_by_type === user.role && Number(task.created_by) === Number(user.id)
+}
+
+/** True for the EA role (admin-level read + create, never edit/delete). */
+export function isEaUser(user: { role?: string } | null | undefined): boolean {
+  return user?.role === 'ea'
+}
+
+/**
+ * True when the user may edit / delete / toggle previous entries.
+ * EA sees the same pages as admin but every write to a previous entry is
+ * blocked (backend enforces this too) — only creating new records is allowed.
+ */
+export function canManageRecords(
+  user: { id: number; role?: string } | null | undefined,
+): boolean {
+  if (!user?.role) return false
+  return user.role === 'admin' || user.role === 'hr'
 }
 
 /**
  * Anyone with project access may move task status (API enforces membership).
+ * EA may move only her own tasks: assigned to her or created by her.
  */
 export function canChangeTaskStatus(
   _task: {
@@ -118,12 +171,21 @@ export function canChangeTaskStatus(
     assignees?: { id: number }[] | null
     assigned_to?: number | null
     assigned_to_client?: number | null
+    assigned_to_ea_ids?: number[] | null
+    eas?: { id: number }[] | null
+    created_by?: number | null
+    created_by_type?: string | null
     status?: string | null
   },
   user: { id: number; role?: string } | null | undefined,
   _newStatus?: string | null,
 ): boolean {
   if (!user) return false
+  if (user.role === 'ea') {
+    return (
+      isTaskAssignedToUser(_task, user.id, user.role) || isOwnCreatedTask(_task, user)
+    )
+  }
   return (
     user.role === 'admin' ||
     user.role === 'hr' ||
@@ -132,18 +194,27 @@ export function canChangeTaskStatus(
   )
 }
 
-/** Status options a user may pick (null = all statuses). */
+/** Status options a user may pick (null = all statuses). EA: only own tasks. */
 export function allowedTaskStatusesForUser(
   _task: {
     assigned_to_ids?: number[] | null
     assignees?: { id: number }[] | null
     assigned_to?: number | null
     assigned_to_client?: number | null
+    assigned_to_ea_ids?: number[] | null
+    eas?: { id: number }[] | null
+    created_by?: number | null
+    created_by_type?: string | null
     status?: string | null
   },
   user: { id: number; role?: string } | null | undefined,
 ): string[] | null {
   if (!user) return []
+  if (user.role === 'ea') {
+    return isTaskAssignedToUser(_task, user.id, user.role) || isOwnCreatedTask(_task, user)
+      ? null
+      : []
+  }
   if (
     user.role === 'admin' ||
     user.role === 'hr' ||
@@ -212,6 +283,7 @@ export function isProjectManagerUser(user: {
 /**
  * Soft-delete attachment: any authenticated portal user who can open the task
  * (same people who can upload). API enforces project access + required remark.
+ * EA never deletes previous entries.
  */
 export function canDeleteTaskAttachment(
   _task: {
@@ -224,6 +296,7 @@ export function canDeleteTaskAttachment(
   } | null | undefined,
 ): boolean {
   if (!user?.role) return false
+  if (user.role === 'ea') return false
   return (
     user.role === 'admin' ||
     user.role === 'hr' ||
@@ -235,6 +308,7 @@ export function canDeleteTaskAttachment(
 /**
  * Full field edits (title, assignees, etc.).
  * Admin/HR org-wide; creator always; project managers on assigned projects.
+ * EA never edits previous entries (create-only role).
  */
 export function canEditTask(
   task: {
@@ -249,6 +323,7 @@ export function canEditTask(
   } | null | undefined,
 ): boolean {
   if (!user || !task) return false
+  if (user.role === 'ea') return false
   // Admin and HR may manage any task (assign, edit, handle clients).
   if (user.role === 'admin' || user.role === 'hr') return true
   // PMs can edit any task on assigned projects (API also enforces project membership).
@@ -272,6 +347,7 @@ export function isClientAssignedTask(task: {
  * only their own assigned tasks (admin / HR may toggle any task).
  * Tasks marked for today or the last working date stay toggleable so the
  * mark can be removed / re-marked; tasks with older history stay locked.
+ * EA never marks Top tasks (create-only role, no assigned tasks).
  */
 export function canToggleTopTask(
   task: {
@@ -287,6 +363,7 @@ export function canToggleTopTask(
   user: { id: number; role?: string } | null | undefined,
 ): boolean {
   if (!user) return false
+  if (user.role === 'ea') return false
   const raw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
   const [today, lastDate] = allowedTopDates()
   // History on any other day locks the task forever.
@@ -301,7 +378,7 @@ export function canToggleTopTask(
 /**
  * Whether the user may mark this task for an explicit Top date (today or the
  * last working date). Same-date re-mark after unmark stays allowed; any other
- * history locks the task.
+ * history locks the task. EA never marks Top tasks.
  */
 export function canMarkTopForDate(
   task: {
@@ -318,6 +395,7 @@ export function canMarkTopForDate(
   date: string,
 ): boolean {
   if (!user) return false
+  if (user.role === 'ea') return false
   const raw = task.top_task_date ? String(task.top_task_date).slice(0, 10) : ''
   if (raw !== '' && raw !== date) return false
   if (isTopOnDate(task, date)) return true // already marked → unmark allowed

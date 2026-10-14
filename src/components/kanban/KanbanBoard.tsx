@@ -82,6 +82,8 @@ function sortColumnTasks(tasks: Task[], status: TaskStatus, sort: KanbanSort): T
 export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps) {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
+  // EA role is view + create only — no bulk-deactivate selection UI.
+  const readOnly = user?.role === 'ea'
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [items, setItems] = useState<Task[]>(() => sortTasksForKanban(tasks, 'id-asc'))
 
@@ -277,7 +279,7 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
 
   return (
     <>
-      {selectedTodoIds.length > 0 && (
+      {!readOnly && selectedTodoIds.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
           <span className="text-sm font-medium text-amber-900">
             {selectedTodoIds.length} To Do task{selectedTodoIds.length === 1 ? '' : 's'} selected
@@ -324,10 +326,10 @@ export function KanbanBoard({ projectId, tasks, onTaskClick }: KanbanBoardProps)
               canMoveTask={canMoveTask}
               sort={resolveColumnSort(col.value, columnSorts)}
               onSortChange={handleColumnSortChange}
-              selectedIds={col.value === 'todo' ? selectedTodoIds : undefined}
-              onToggleSelect={col.value === 'todo' ? toggleTodoSelect : undefined}
+              selectedIds={col.value === 'todo' && !readOnly ? selectedTodoIds : undefined}
+              onToggleSelect={col.value === 'todo' && !readOnly ? toggleTodoSelect : undefined}
               onToggleAll={
-                col.value === 'todo' ? () => toggleAllTodo(columns.todo) : undefined
+                col.value === 'todo' && !readOnly ? () => toggleAllTodo(columns.todo) : undefined
               }
             />
           ))}

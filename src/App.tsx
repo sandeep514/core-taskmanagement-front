@@ -5,6 +5,7 @@ import { HydrationGate } from '@/components/auth/HydrationGate'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RealtimeProvider } from '@/components/realtime/RealtimeProvider'
 import { AdminLayout } from '@/components/layout/AdminLayout'
+import { EaLayout } from '@/components/layout/EaLayout'
 import { HrLayout } from '@/components/layout/HrLayout'
 import { EmployeeLayout } from '@/components/layout/EmployeeLayout'
 import { ClientLayout } from '@/components/layout/ClientLayout'
@@ -15,6 +16,7 @@ import { DepartmentsPage } from '@/pages/admin/DepartmentsPage'
 import { ClientsPage } from '@/pages/admin/ClientsPage'
 import { EmployeesPage } from '@/pages/admin/EmployeesPage'
 import { HrsPage } from '@/pages/admin/HrsPage'
+import { EasPage } from '@/pages/admin/EasPage'
 import { ActivityLogsPage } from '@/pages/admin/ActivityLogsPage'
 import { ProjectsPage } from '@/pages/admin/ProjectsPage'
 import { AdminProjectBoardPage } from '@/pages/admin/AdminProjectBoardPage'
@@ -56,6 +58,7 @@ export default function App() {
                 <Route path="clients" element={<ClientsPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
                 <Route path="hrs" element={<HrsPage />} />
+                <Route path="eas" element={<EasPage />} />
                 <Route path="todos" element={<PersonalTodosPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
@@ -73,6 +76,26 @@ export default function App() {
                 <Route path="departments" element={<DepartmentsPage />} />
                 <Route path="clients" element={<ClientsPage />} />
                 <Route path="employees" element={<EmployeesPage />} />
+                <Route path="eas" element={<EasPage />} />
+                <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
+                <Route path="top-tasks" element={<TopTasksReportPage />} />
+                <Route path="activity-logs" element={<ActivityLogsPage />} />
+                <Route path="work-report" element={<WorkReportPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+            </Route>
+
+            <Route element={<ProtectedRoute role="ea" />}>
+              <Route path="/ea" element={<EaLayout />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="todos" element={<PersonalTodosPage />} />
+                <Route path="designations" element={<DesignationsPage />} />
+                <Route path="departments" element={<DepartmentsPage />} />
+                <Route path="clients" element={<ClientsPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="hrs" element={<HrsPage />} />
+                <Route path="eas" element={<EasPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
                 <Route path="top-tasks" element={<TopTasksReportPage />} />

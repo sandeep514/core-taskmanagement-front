@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { addTaskAttachment, createTask, fetchProject, fetchProjectMembers, updateTask } from '@/lib/api'
+import { addTaskAttachment, createTask, fetchEas, fetchProject, fetchProjectMembers, updateTask } from '@/lib/api'
 import {
   getApiError,
   MAX_ATTACHMENT_BYTES,
@@ -15,6 +15,7 @@ import {
   cn,
   computeEstimateEndDate,
   taskAssigneeIds,
+  taskEaAssigneeIds,
   todayDateString,
 } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -57,6 +58,7 @@ const empty = (status: TaskStatus = 'todo'): TaskFormData => ({
   estimate_minutes: '',
   assigned_to_ids: [],
   assigned_to_client: '',
+  assigned_to_ea_ids: [],
   priority: 'medium',
   task_type: 'general',
   status,
@@ -110,6 +112,14 @@ export function TaskFormModal({
     queryFn: () => fetchProject(projectId),
     enabled: open && !!projectId,
   })
+  // EA assignment picker (admin / HR / EA portals only).
+  const canAssignEa = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'ea'
+  const { data: eas } = useQuery({
+    queryKey: ['eas'],
+    queryFn: fetchEas,
+    enabled: open && canAssignEa,
+  })
+  const activeEas = (eas ?? []).filter((e) => e.status === 'active')
   const [form, setForm] = useState<TaskFormData>(empty(defaultStatus))
   const [files, setFiles] = useState<File[]>([])
 
@@ -127,6 +137,7 @@ export function TaskFormModal({
             : task.estimate_minutes,
         assigned_to_ids: taskAssigneeIds(task),
         assigned_to_client: task.assigned_to_client ?? '',
+        assigned_to_ea_ids: taskEaAssigneeIds(task),
         priority: task.priority,
         task_type: task.task_type ?? 'general',
         status: task.status,
@@ -145,13 +156,13 @@ export function TaskFormModal({
     if (active.length !== 1) return
     const onlyId = active[0].id
     setForm((f) => {
-      if (f.assigned_to_ids.length > 0 || f.assigned_to_client !== '') return f
-      return { ...f, assigned_to_ids: [onlyId], assigned_to_client: '' }
+      if (f.assigned_to_ids.length > 0 || f.assigned_to_client !== '' || f.assigned_to_ea_ids.length > 0) return f
+      return { ...f, assigned_to_ids: [onlyId], assigned_to_client: '', assigned_to_ea_ids: [] }
     })
   }, [open, task, employees])
 
   const clearAssignees = () => {
-    setForm((f) => ({ ...f, assigned_to_ids: [], assigned_to_client: '' }))
+    setForm((f) => ({ ...f, assigned_to_ids: [], assigned_to_client: '', assigned_to_ea_ids: [] }))
   }
 
   const assignClient = (clientId: number) => {
@@ -159,6 +170,7 @@ export function TaskFormModal({
       ...f,
       is_internal: false,
       assigned_to_ids: [],
+      assigned_to_ea_ids: [],
       assigned_to_client: f.assigned_to_client === clientId ? '' : clientId,
     }))
   }
@@ -169,7 +181,17 @@ export function TaskFormModal({
       const next = has
         ? f.assigned_to_ids.filter((id) => id !== employeeId)
         : [...f.assigned_to_ids, employeeId]
-      return { ...f, assigned_to_ids: next, assigned_to_client: '' }
+      return { ...f, assigned_to_ids: next, assigned_to_client: '', assigned_to_ea_ids: [] }
+    })
+  }
+
+  const toggleEa = (eaId: number) => {
+    setForm((f) => {
+      const has = f.assigned_to_ea_ids.includes(eaId)
+      const next = has
+        ? f.assigned_to_ea_ids.filter((id) => id !== eaId)
+        : [...f.assigned_to_ea_ids, eaId]
+      return { ...f, assigned_to_ea_ids: next, assigned_to_ids: [], assigned_to_client: '' }
     })
   }
 
@@ -233,11 +255,14 @@ export function TaskFormModal({
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const isUnassigned = form.assigned_to_ids.length === 0 && form.assigned_to_client === ''
+  const isUnassigned =
+    form.assigned_to_ids.length === 0 &&
+    form.assigned_to_client === '' &&
+    form.assigned_to_ea_ids.length === 0
   const activeEmployees = (employees ?? []).filter((e) => e.status === 'active')
   const statusLocked = Boolean(task) && !canChangeTaskStatus(task!, user)
   const fieldsLocked = Boolean(task) && !canEditTask(task, user)
-  const canSetInternal = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'employee'
+  const canSetInternal = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'ea' || user?.role === 'employee'
   const allowedStatuses = task ? allowedTaskStatusesForUser(task, user) : null
   const statusOptions =
     allowedStatuses === null
@@ -324,7 +349,8 @@ export function TaskFormModal({
             >
               <Label>Assignees</Label>
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Employees and client are exclusive. Multiple employees → one task each.
+                Employees, client and EA are exclusive. Multiple employees → one task each.
+                Multiple EAs → one task each.
                 {form.is_internal ? ' Internal tasks cannot be assigned to the client.' : ''}
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -382,6 +408,38 @@ export function TaskFormModal({
                       </label>
                     )
                   })}
+                </div>
+              )}
+              {canAssignEa && activeEas.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    Executive Assistants (exclusive — clears employees/client)
+                  </p>
+                  <div className="max-h-[96px] overflow-y-auto rounded-lg border border-violet-200 divide-y divide-border">
+                    {activeEas.map((e) => {
+                      const checked = form.assigned_to_ea_ids.includes(e.id)
+                      return (
+                        <label
+                          key={e.id}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-2.5 px-2.5 py-1.5 text-sm hover:bg-violet-50/60',
+                            checked && 'bg-violet-50',
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-border"
+                            checked={checked}
+                            onChange={() => toggleEa(e.id)}
+                          />
+                          <span className="font-medium truncate">EA · {e.name}</span>
+                          <span className="ml-auto text-[11px] text-muted-foreground shrink-0">
+                            {e.email}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>

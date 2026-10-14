@@ -7,6 +7,7 @@ import type {
   DashboardStats,
   Department,
   Designation,
+  EaUser,
   Employee,
   HrUser,
   LoginResponse,
@@ -38,13 +39,13 @@ const api = axios.create({
  * HR shares admin API routes (ability:admin,hr).
  */
 function portalBase(role?: UserRole | null): 'admin' | 'employee' | 'client' {
-  if (role === 'hr') return 'admin'
+  if (role === 'hr' || role === 'ea') return 'admin'
   if (role === 'admin' || role === 'employee' || role === 'client') return role
   try {
     const raw = localStorage.getItem('taskflow_user')
     if (raw) {
       const user = JSON.parse(raw) as AuthUser
-      if (user.role === 'hr') return 'admin'
+      if (user.role === 'hr' || user.role === 'ea') return 'admin'
       if (user.role === 'admin' || user.role === 'employee' || user.role === 'client') {
         return user.role
       }
@@ -58,18 +59,21 @@ function portalBase(role?: UserRole | null): 'admin' | 'employee' | 'client' {
 export function homePathForRole(role: UserRole): string {
   if (role === 'admin') return '/admin'
   if (role === 'hr') return '/hr'
+  if (role === 'ea') return '/ea'
   if (role === 'client') return '/client'
   return '/employee'
 }
 
-/** UI path prefix for admin-like portals (admin vs hr). */
-export function portalUiBase(role?: UserRole | null): '/admin' | '/hr' {
+/** UI path prefix for admin-like portals (admin vs hr vs ea). */
+export function portalUiBase(role?: UserRole | null): '/admin' | '/hr' | '/ea' {
   if (role === 'hr') return '/hr'
+  if (role === 'ea') return '/ea'
   try {
     const raw = localStorage.getItem('taskflow_user')
     if (raw) {
       const user = JSON.parse(raw) as AuthUser
       if (user.role === 'hr') return '/hr'
+      if (user.role === 'ea') return '/ea'
     }
   } catch {
     // ignore
@@ -129,6 +133,9 @@ function normalizeTaskPayload(payload: Partial<TaskFormData>) {
     assigned_to_ids: Array.isArray(payload.assigned_to_ids)
       ? payload.assigned_to_ids.map(Number)
       : [],
+    assigned_to_ea_ids: Array.isArray(payload.assigned_to_ea_ids)
+      ? payload.assigned_to_ea_ids.map(Number)
+      : [],
     assigned_to_client:
       payload.assigned_to_client === '' || payload.assigned_to_client === undefined
         ? null
@@ -164,6 +171,11 @@ export async function loginAdmin(email: string, password: string): Promise<Login
 
 export async function loginHr(email: string, password: string): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/hr/login', { email, password })
+  return data
+}
+
+export async function loginEa(email: string, password: string): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/ea/login', { email, password })
   return data
 }
 
@@ -538,6 +550,7 @@ export async function bulkCreateTasks(
     status?: TaskStatus
     assigned_to_ids?: number[]
     assigned_to_client?: number | null
+    assigned_to_ea_ids?: number[]
     is_internal?: boolean
   },
 ): Promise<Task[]> {
@@ -551,6 +564,7 @@ export async function bulkCreateTasks(
       status: payload.status ?? 'todo',
       assigned_to_ids: payload.assigned_to_ids ?? [],
       assigned_to_client: payload.assigned_to_client ?? null,
+      assigned_to_ea_ids: payload.assigned_to_ea_ids ?? [],
       is_internal: Boolean(payload.is_internal),
     },
   )
@@ -920,7 +934,7 @@ export async function fetchWorkReport(params: {
 // ─── Activity logs (admin + HR) ─────────────────────────────────────────────
 
 export async function fetchActivityLogs(params?: {
-  user_type?: 'employee' | 'hr' | 'admin' | 'client' | ''
+  user_type?: 'employee' | 'hr' | 'ea' | 'admin' | 'client' | ''
   user_id?: number | null
   action?: string
   project_id?: number | null
@@ -980,6 +994,44 @@ export async function updateHr(
 
 export async function toggleHrStatus(id: number): Promise<HrUser> {
   const { data } = await api.post<HrUser>(`/admin/hrs/${id}/toggle-status`)
+  return data
+}
+
+// ─── Admin/HR: EA accounts (EA callers read-only) ────────────────────────────
+
+export async function fetchEas(): Promise<EaUser[]> {
+  const { data } = await api.get<EaUser[]>('/admin/eas')
+  return data
+}
+
+export async function createEa(
+  payload: Partial<EaUser> & { password?: string },
+): Promise<EaUser> {
+  const { data } = await api.post<EaUser>('/admin/eas', {
+    name: payload.name,
+    email: payload.email,
+    password: payload.password || undefined,
+    status: payload.status ?? 'active',
+  })
+  return data
+}
+
+export async function updateEa(
+  id: number,
+  payload: Partial<EaUser> & { password?: string },
+): Promise<EaUser> {
+  const body: Record<string, unknown> = {
+    name: payload.name,
+    email: payload.email,
+    status: payload.status,
+  }
+  if (payload.password) body.password = payload.password
+  const { data } = await api.put<EaUser>(`/admin/eas/${id}`, body)
+  return data
+}
+
+export async function toggleEaStatus(id: number): Promise<EaUser> {
+  const { data } = await api.post<EaUser>(`/admin/eas/${id}/toggle-status`)
   return data
 }
 

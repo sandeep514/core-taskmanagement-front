@@ -39,7 +39,7 @@ function firstDayOfMonth(): string {
 
 export function WorkReportPage() {
   const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.role === 'admin' || user?.role === 'hr'
+  const isAdmin = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'ea'
   const isEmployee = user?.role === 'employee'
 
   const [from, setFrom] = useState(() => firstDayOfMonth())

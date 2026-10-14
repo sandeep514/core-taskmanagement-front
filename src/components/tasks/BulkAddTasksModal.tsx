@@ -4,6 +4,7 @@ import { ListPlus, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   bulkCreateTasks,
+  fetchEas,
   fetchProject,
   fetchProjectMembers,
   parseBulkTaskTitles,
@@ -48,12 +49,13 @@ export function BulkAddTasksModal({
 }: BulkAddTasksModalProps) {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
-  const canSetInternal = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'employee'
+  const canSetInternal = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'ea' || user?.role === 'employee'
   const [text, setText] = useState('')
   const [taskType, setTaskType] = useState<TaskType>('general')
   const [priority, setPriority] = useState<TaskPriority>('medium')
   const [assignedToIds, setAssignedToIds] = useState<number[]>([])
   const [assignedToClient, setAssignedToClient] = useState<number | ''>('')
+  const [assignedToEaIds, setAssignedToEaIds] = useState<number[]>([])
   const [isInternal, setIsInternal] = useState(false)
 
   const { data: employees } = useQuery({
@@ -66,6 +68,15 @@ export function BulkAddTasksModal({
     queryFn: () => fetchProject(projectId),
     enabled: open && !!projectId,
   })
+
+  // EA assignment picker (admin / HR / EA portals only).
+  const canAssignEa = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'ea'
+  const { data: eas } = useQuery({
+    queryKey: ['eas'],
+    queryFn: fetchEas,
+    enabled: open && canAssignEa,
+  })
+  const activeEas = (eas ?? []).filter((e) => e.status === 'active')
 
   const titles = useMemo(() => parseBulkTaskTitles(text, MAX_TITLES), [text])
   const rawLineCount = useMemo(
@@ -85,6 +96,7 @@ export function BulkAddTasksModal({
     setPriority('medium')
     setAssignedToIds([])
     setAssignedToClient('')
+    setAssignedToEaIds([])
     setIsInternal(false)
   }, [open, projectId])
 
@@ -93,29 +105,42 @@ export function BulkAddTasksModal({
     if (!open) return
     const active = (employees ?? []).filter((e) => e.status !== 'inactive')
     if (active.length !== 1) return
-    setAssignedToIds((ids) => (ids.length === 0 && assignedToClient === '' ? [active[0].id] : ids))
-  }, [open, employees, assignedToClient])
+    setAssignedToIds((ids) => (ids.length === 0 && assignedToClient === '' && assignedToEaIds.length === 0 ? [active[0].id] : ids))
+  }, [open, employees, assignedToClient, assignedToEaIds])
 
   const activeEmployees = (employees ?? []).filter((e) => e.status !== 'inactive')
-  const isUnassigned = assignedToIds.length === 0 && assignedToClient === ''
+  const isUnassigned = assignedToIds.length === 0 && assignedToClient === '' && assignedToEaIds.length === 0
 
   const clearAssignees = () => {
     setAssignedToIds([])
     setAssignedToClient('')
+    setAssignedToEaIds([])
   }
 
   const assignClient = (clientId: number) => {
     setIsInternal(false)
     setAssignedToIds([])
+    setAssignedToEaIds([])
     setAssignedToClient((prev) => (prev === clientId ? '' : clientId))
   }
 
   const toggleEmployee = (employeeId: number) => {
     setAssignedToClient('')
+    setAssignedToEaIds([])
     setAssignedToIds((ids) =>
       ids.includes(employeeId)
         ? ids.filter((id) => id !== employeeId)
         : [...ids, employeeId],
+    )
+  }
+
+  const toggleEa = (eaId: number) => {
+    setAssignedToClient('')
+    setAssignedToIds([])
+    setAssignedToEaIds((ids) =>
+      ids.includes(eaId)
+        ? ids.filter((id) => id !== eaId)
+        : [...ids, eaId],
     )
   }
 
@@ -134,6 +159,7 @@ export function BulkAddTasksModal({
         assigned_to_ids: assignedToIds,
         assigned_to_client:
           isInternal || assignedToClient === '' ? null : Number(assignedToClient),
+        assigned_to_ea_ids: assignedToEaIds,
         is_internal: isInternal,
       })
     },
@@ -329,6 +355,38 @@ export function BulkAddTasksModal({
               <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border p-3">
                 No team members on this project yet. Tasks can still be created unassigned.
               </p>
+            )}
+            {canAssignEa && activeEas.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium text-muted-foreground">
+                  Executive Assistants (exclusive — clears employees/client)
+                </p>
+                <div className="max-h-[120px] overflow-y-auto rounded-lg border border-violet-200 divide-y divide-border">
+                  {activeEas.map((e) => {
+                    const checked = assignedToEaIds.includes(e.id)
+                    return (
+                      <label
+                        key={e.id}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2.5 px-2.5 py-1.5 text-sm hover:bg-violet-50/60',
+                          checked && 'bg-violet-50',
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-border"
+                          checked={checked}
+                          onChange={() => toggleEa(e.id)}
+                        />
+                        <span className="font-medium truncate">EA · {e.name}</span>
+                        <span className="ml-auto text-[11px] text-muted-foreground shrink-0">
+                          {e.email}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>

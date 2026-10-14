@@ -36,6 +36,8 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ClientsTable } from '@/components/clients/ClientsTable'
 import { useListView } from '@/hooks/use-list-view'
 import { ListToolbar, type StatusFilter } from '@/components/ui/list-toolbar'
+import { canManageRecords } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 
 const empty = {
   name: '',
@@ -49,6 +51,9 @@ const empty = {
 
 export function ClientsPage() {
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  // EA callers see the list read-only (API blocks every EA write).
+  const canManage = canManageRecords(user)
   const { data, isLoading } = useQuery({ queryKey: ['clients'], queryFn: fetchClients })
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Client | null>(null)
@@ -185,22 +190,26 @@ export function ClientsPage() {
                     </Badge>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title={item.status === 'active' ? 'Deactivate' : 'Activate'}
-                      className={
-                        item.status === 'active'
-                          ? 'text-amber-600 hover:text-amber-700'
-                          : 'text-emerald-600 hover:text-emerald-700'
-                      }
-                      onClick={() => toggle.mutate(item.id)}
-                    >
-                      <Power className="h-4 w-4" />
-                    </Button>
+                    {canManage && (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title={item.status === 'active' ? 'Deactivate' : 'Activate'}
+                          className={
+                            item.status === 'active'
+                              ? 'text-amber-600 hover:text-amber-700'
+                              : 'text-emerald-600 hover:text-emerald-700'
+                          }
+                          onClick={() => toggle.mutate(item.id)}
+                        >
+                          <Power className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 space-y-2 text-sm text-muted-foreground">

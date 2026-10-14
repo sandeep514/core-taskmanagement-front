@@ -272,7 +272,9 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
           <div className="flex items-center gap-1.5 min-w-0">
             {(task.assignees && task.assignees.length > 0) ||
             task.assignee ||
-            task.client_assignee ? (
+            task.client_assignee ||
+            (task.eas && task.eas.length > 0) ||
+            (task.assigned_to_ea_ids && task.assigned_to_ea_ids.length > 0) ? (
               <>
                 <div className="flex -space-x-1.5 shrink-0">
                   {task.client_assignee ? (
@@ -281,16 +283,24 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
                         {initials(task.client_assignee.name)}
                       </AvatarFallback>
                     </Avatar>
+                  ) : task.eas && task.eas.length > 0 ? (
+                    task.eas.slice(0, 3).map((person) => (
+                      <Avatar key={person.id} className="h-6 w-6 ring-2 ring-card">
+                        <AvatarFallback className="text-[9px] bg-violet-100 text-violet-700">
+                          {initials(person.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))
                   ) : (
                     (task.assignees?.length ? task.assignees : task.assignee ? [task.assignee] : [])
                       .slice(0, 3)
                       .map((person) => (
-                        <Avatar key={person.id} className="h-6 w-6 ring-2 ring-card">
-                          <AvatarFallback className="text-[9px] bg-indigo-100 text-indigo-700">
-                            {initials(person.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))
+                      <Avatar key={person.id} className="h-6 w-6 ring-2 ring-card">
+                        <AvatarFallback className="text-[9px] bg-indigo-100 text-indigo-700">
+                          {initials(person.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground truncate max-w-[110px]">

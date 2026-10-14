@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Briefcase, Eye, EyeOff, Loader2, Shield, User, UserCog } from 'lucide-react'
+import { Briefcase, Eye, EyeOff, Loader2, Shield, User, UserCheck, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/authStore'
 import type { UserRole } from '@/types'
@@ -14,6 +14,7 @@ import { homePathForRole } from '@/lib/api'
 const roleDefaults: Record<UserRole, string> = {
   admin: '',
   hr: '',
+  ea: '',
   employee: '',
   client: '',
 }
@@ -21,6 +22,7 @@ const roleDefaults: Record<UserRole, string> = {
 const roleLabels: Record<UserRole, string> = {
   admin: 'Admin',
   hr: 'HR',
+  ea: 'EA',
   employee: 'Employee',
   client: 'Client',
 }
@@ -73,17 +75,18 @@ export function LoginPage() {
 
         <div className="relative z-10 max-w-md">
           <h1 className="text-4xl font-bold leading-tight tracking-tight">
-            Admin, HR, team &amp; client portals
+            Admin, HR, EA, team &amp; client portals
           </h1>
           <p className="mt-4 text-slate-400 text-lg leading-relaxed">
             Manage organization setup, HR client handling, employee Kanban boards, and let
             clients track and contribute to their project tasks.
           </p>
 
-          <div className="mt-10 grid grid-cols-4 gap-3">
+          <div className="mt-10 grid grid-cols-5 gap-3">
             {[
               { label: 'Admin', value: 'Org' },
               { label: 'HR', value: 'People' },
+              { label: 'EA', value: 'Assist' },
               { label: 'Employee', value: 'Team' },
               { label: 'Client', value: 'Portal' },
             ].map((stat) => (
@@ -117,11 +120,12 @@ export function LoginPage() {
             Choose your portal and enter your credentials
           </p>
 
-          <div className="mt-6 grid grid-cols-4 gap-1 rounded-xl bg-secondary p-1">
+          <div className="mt-6 grid grid-cols-5 gap-1 rounded-xl bg-secondary p-1">
             {(
               [
                 { key: 'admin' as const, icon: Shield, label: 'Admin' },
                 { key: 'hr' as const, icon: UserCog, label: 'HR' },
+                { key: 'ea' as const, icon: UserCheck, label: 'EA' },
                 { key: 'employee' as const, icon: User, label: 'Employee' },
                 { key: 'client' as const, icon: Briefcase, label: 'Client' },
               ] as const

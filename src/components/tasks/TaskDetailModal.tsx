@@ -124,6 +124,8 @@ export function TaskDetailModal({
   })
 
   const mayEdit = canEditTask(task, user)
+  // EA role is view + create only: no copy/comment/attach/subtask writes on previous entries.
+  const readOnly = user?.role === 'ea'
   // Show delete whenever the user is logged into a portal role (upload is also open).
   const mayDeleteAttachment = canDeleteTaskAttachment(task, user)
   const creatorLabel = task ? formatTaskCreator(task) : '—'
@@ -295,14 +297,16 @@ export function TaskDetailModal({
                       {markedBeforeLabel}
                     </Button>
                     ) : null}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCopyOpen(true)}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      Copy
-                    </Button>
+                    {!readOnly && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCopyOpen(true)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Copy
+                      </Button>
+                    )}
                     {mayEdit ? (
                       <Button
                         variant="outline"
@@ -438,7 +442,8 @@ export function TaskDetailModal({
                   <p className="text-xs text-muted-foreground mb-1.5">Assignees</p>
                   {(task.assignees && task.assignees.length > 0) ||
                   task.assignee ||
-                  task.client_assignee ? (
+                  task.client_assignee ||
+                  (task.eas && task.eas.length > 0) ? (
                     <div className="space-y-2">
                       {task.client_assignee ? (
                         <div className="flex items-center gap-2">
@@ -451,6 +456,17 @@ export function TaskDetailModal({
                             Client · {task.client_assignee.name}
                           </span>
                         </div>
+                      ) : (task.eas && task.eas.length > 0) ? (
+                        task.eas.map((person) => (
+                          <div key={person.id} className="flex items-center gap-2">
+                            <Avatar className="h-7 w-7">
+                              <AvatarFallback className="text-[10px] bg-violet-100 text-violet-700">
+                                {initials(person.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium">EA · {person.name}</span>
+                          </div>
+                        ))
                       ) : (
                         (task.assignees?.length
                           ? task.assignees
@@ -535,24 +551,32 @@ export function TaskDetailModal({
                 </div>
 
                 <div className="flex gap-2">
-                  <Textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Write a comment…"
-                    className="min-h-[72px]"
-                  />
-                  <Button
-                    size="icon"
-                    className="h-10 w-10 shrink-0 self-end"
-                    disabled={!comment.trim() || commentMutation.isPending}
-                    onClick={() => commentMutation.mutate()}
-                  >
-                    {commentMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {readOnly ? (
+                    <p className="text-xs text-muted-foreground">
+                      The EA role is view + create only — commenting on previous entries is disabled.
+                    </p>
+                  ) : (
+                    <>
+                      <Textarea
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        placeholder="Write a comment…"
+                        className="min-h-[72px]"
+                      />
+                      <Button
+                        size="icon"
+                        className="h-10 w-10 shrink-0 self-end"
+                        disabled={!comment.trim() || commentMutation.isPending}
+                        onClick={() => commentMutation.mutate()}
+                      >
+                        {commentMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -562,7 +586,7 @@ export function TaskDetailModal({
                 task={task}
                 projectId={projectId}
                 canManage={mayEdit}
-                canComplete={Boolean(user)}
+                canComplete={Boolean(user) && !readOnly}
               />
 
               <Separator />
@@ -576,35 +600,39 @@ export function TaskDetailModal({
                     <Badge variant="secondary">{task.attachments?.length ?? 0}</Badge>
                   </h4>
                   <div>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          if (file.size > MAX_ATTACHMENT_BYTES) {
-                            toast.error(`"${file.name}" exceeds the ${MAX_ATTACHMENT_LABEL} limit.`)
-                          } else {
-                            attachMutation.mutate(file)
-                          }
-                        }
-                        e.target.value = ''
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileRef.current?.click()}
-                      disabled={attachMutation.isPending}
-                    >
-                      {attachMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="h-3.5 w-3.5" />
-                      )}
-                      Upload
-                    </Button>
+                    {!readOnly && (
+                      <>
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              if (file.size > MAX_ATTACHMENT_BYTES) {
+                                toast.error(`"${file.name}" exceeds the ${MAX_ATTACHMENT_LABEL} limit.`)
+                              } else {
+                                attachMutation.mutate(file)
+                              }
+                            }
+                            e.target.value = ''
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileRef.current?.click()}
+                          disabled={attachMutation.isPending}
+                        >
+                          {attachMutation.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          Upload
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
                 {(task.attachments?.length ?? 0) === 0 ? (
