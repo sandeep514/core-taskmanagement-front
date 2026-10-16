@@ -614,6 +614,12 @@ export async function updateTaskStatus(taskId: number, status: TaskStatus): Prom
   return data
 }
 
+/** Claim an unassigned task: assign it to the current employee. */
+export async function claimTask(taskId: number): Promise<Task> {
+  const { data } = await api.post<Task>(`/${portalBase()}/tasks/${taskId}/claim`)
+  return data
+}
+
 /** Mark / unmark a task as Top for today or the last working date (backfill). Pass explicit value or omit to toggle. */
 export async function toggleTaskTop(
   taskId: number,

@@ -2,11 +2,11 @@ import { forwardRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, Star, UserRound } from 'lucide-react'
+import { Briefcase, Calendar, Clock, Lock, MessageSquare, Paperclip, Star, UserPlus, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, TASK_TYPES, isTopOnDate, isTopToday, lastWorkingDateKey } from '@/types'
-import { toggleTaskTop } from '@/lib/api'
+import { claimTask, toggleTaskTop } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import {
   cn,
@@ -19,6 +19,7 @@ import {
   initials,
   isClientAssignedTask,
   isOverdue,
+  isTaskUnassigned,
 } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ProgressBar } from '@/components/ui/progress-bar'
@@ -136,6 +137,49 @@ export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' |
         onConfirm={(date) => mutation.mutate(date)}
       />
     </>
+  )
+}
+
+/**
+ * "Take" button on unassigned tasks (employee portal only). Lets an employee
+ * assign an unassigned task to themselves. Stops card-open + drag.
+ */
+export function ClaimTaskButton({ task }: { task: Task }) {
+  const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const mutation = useMutation({
+    mutationFn: () => claimTask(task.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project-tasks'] })
+      qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
+      qc.invalidateQueries({ queryKey: ['task'] })
+      toast.success('Task assigned to you')
+    },
+    onError: (err) => toast.error(getApiError(err, 'Could not assign task')),
+  })
+
+  if (user?.role !== 'employee') return null
+  if (!isTaskUnassigned(task)) return null
+
+  return (
+    <button
+      type="button"
+      title="Assign this task to me"
+      aria-label="Assign this task to me"
+      disabled={mutation.isPending}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation()
+        mutation.mutate()
+      }}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 transition-colors hover:bg-indigo-100',
+        mutation.isPending && 'opacity-50',
+      )}
+    >
+      <UserPlus className="h-3 w-3" />
+      {mutation.isPending ? 'Taking…' : 'Take'}
+    </button>
   )
 }
 interface TaskCardContentProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -308,7 +352,10 @@ export const TaskCardContent = forwardRef<HTMLDivElement, TaskCardContentProps>(
                 </span>
               </>
             ) : (
-              <span className="text-xs text-muted-foreground">Unassigned</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Unassigned</span>
+                {!isOverlay && <ClaimTaskButton task={task} />}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2 text-muted-foreground shrink-0">

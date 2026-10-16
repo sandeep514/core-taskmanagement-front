@@ -19,12 +19,14 @@ import {
   Star,
   Trash2,
   Upload,
+  UserPlus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   addTaskAttachment,
   addTaskComment,
   attachmentUrl,
+  claimTask,
   deactivateTask,
   deleteTaskAttachment,
   fetchTask,
@@ -59,6 +61,7 @@ import {
   initials,
   isClientAssignedTask,
   isOverdue,
+  isTaskUnassigned,
 } from '@/lib/utils'
 import { useMyTopStatus } from '@/hooks/useMyTopStatus'
 import { TopDateDialog } from '@/components/tasks/TopDateDialog'
@@ -135,6 +138,16 @@ export function TaskDetailModal({
     qc.invalidateQueries({ queryKey: ['project-tasks', projectId] })
     qc.invalidateQueries({ queryKey: ['my-assigned-tasks'] })
   }
+
+  const claimMutation = useMutation({
+    mutationFn: () => claimTask(taskId!),
+    onSuccess: (updated) => {
+      qc.setQueryData(['task', taskId], updated)
+      invalidateTaskQueries()
+      toast.success('Task assigned to you')
+    },
+    onError: (err) => toast.error(getApiError(err, 'Could not assign task')),
+  })
 
   const commentMutation = useMutation({
     mutationFn: () => addTaskComment(taskId!, comment),
@@ -492,7 +505,23 @@ export function TaskDetailModal({
                         )}
                     </div>
                   ) : (
-                    <span className="text-sm text-muted-foreground">Unassigned</span>
+                    <div className="space-y-2">
+                      <span className="text-sm text-muted-foreground">Unassigned</span>
+                      {user?.role === 'employee' && task && isTaskUnassigned(task) && (
+                        <div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                            disabled={claimMutation.isPending}
+                            onClick={() => claimMutation.mutate()}
+                          >
+                            <UserPlus className="h-3.5 w-3.5" />
+                            {claimMutation.isPending ? 'Assigning…' : 'Assign to me'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="rounded-lg border border-border p-3">

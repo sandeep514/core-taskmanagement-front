@@ -144,6 +144,22 @@ export function isOwnCreatedTask(
   return task.created_by_type === user.role && Number(task.created_by) === Number(user.id)
 }
 
+/** True when nobody holds the task: no employees, client, or EAs. */
+export function isTaskUnassigned(task: {
+  assigned_to_ids?: number[] | null
+  assignees?: { id: number }[] | null
+  assigned_to?: number | null
+  assigned_to_client?: number | null
+  client_assignee?: { id: number } | null
+  assigned_to_ea_ids?: number[] | null
+  eas?: { id: number }[] | null
+}): boolean {
+  if (task.assigned_to_client != null || task.client_assignee != null) return false
+  if (taskAssigneeIds(task).length > 0) return false
+  if (taskEaAssigneeIds(task).length > 0) return false
+  return true
+}
+
 /** True for the EA role (admin-level read + create, never edit/delete). */
 export function isEaUser(user: { role?: string } | null | undefined): boolean {
   return user?.role === 'ea'
