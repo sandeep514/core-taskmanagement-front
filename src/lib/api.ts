@@ -22,6 +22,7 @@ import type {
   TaskType,
   TodoFilter,
   UserRole,
+  EmployeeTopTasksReport,
   WorkReport,
 } from '@/types'
 
@@ -933,6 +934,20 @@ export async function fetchWorkReport(params: {
   const base = portalBase(params.role)
   const { data } = await api.get<WorkReport>(`/${base}/work-report`, {
     params: query,
+  })
+  return data
+}
+
+// ─── Employee Top-Tasks report (admin portal) ───────────────────────────────
+
+export async function fetchEmployeeTopTasksReport(params: {
+  from: string
+  to: string
+  role?: UserRole | null
+}): Promise<EmployeeTopTasksReport> {
+  const base = portalBase(params.role)
+  const { data } = await api.get<EmployeeTopTasksReport>(`/${base}/employee-top-tasks`, {
+    params: { from: params.from, to: params.to },
   })
   return data
 }

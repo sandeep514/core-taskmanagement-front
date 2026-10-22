@@ -1,4 +1,8 @@
-import type { Task } from '@/types'
+import type {
+  EmployeeTopTaskItem,
+  EmployeeTopTasksReportEmployeeRow,
+  Task,
+} from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import {
   formatDate,
@@ -151,18 +155,50 @@ function cellXml(value: string | number): string {
   return `<Cell><Data ss:Type="String">${text}</Data></Cell>`
 }
 
+export interface SpreadsheetSheet {
+  name: string
+  headers: string[]
+  rows: Array<Array<string | number>>
+}
+
+/** Excel forbids certain characters in sheet names, caps length at 31, and requires uniqueness. */
+function sanitizeSheetName(raw: string, used: Set<string>): string {
+  let name = raw.replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 31).trim()
+  if (!name) name = 'Sheet'
+  let candidate = name
+  let n = 2
+  while (used.has(candidate.toLowerCase())) {
+    const suffix = ` (${n})`
+    candidate = name.slice(0, 31 - suffix.length) + suffix
+    n += 1
+  }
+  used.add(candidate.toLowerCase())
+  return candidate
+}
+
+function worksheetXml(sheet: SpreadsheetSheet, usedNames: Set<string>): string {
+  const safeSheet = escapeXml(sanitizeSheetName(sheet.name, usedNames))
+  const headerRow = `<Row>${sheet.headers.map((h) => cellXml(h)).join('')}</Row>`
+  const dataRows = sheet.rows
+    .map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`)
+    .join('')
+
+  return `<Worksheet ss:Name="${safeSheet}">
+  <Table>
+   ${headerRow.replace(/<Cell>/g, '<Cell ss:StyleID="Header">')}
+   ${dataRows}
+  </Table>
+ </Worksheet>`
+}
+
 /**
  * Build Excel-compatible SpreadsheetML (opens in Excel / LibreOffice / Google Sheets).
  * Zero runtime dependencies — avoids fragile xlsx package installs on deploy servers.
+ * Supports one or many worksheets (one sheet per employee, etc.).
  */
-function buildSpreadsheetMl(
-  headers: string[],
-  rows: Array<Array<string | number>>,
-  sheetName: string,
-): string {
-  const safeSheet = escapeXml(sheetName.slice(0, 31) || 'Tasks')
-  const headerRow = `<Row>${headers.map((h) => cellXml(h)).join('')}</Row>`
-  const dataRows = rows.map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`).join('')
+function buildSpreadsheetMl(sheets: SpreadsheetSheet[]): string {
+  const usedNames = new Set<string>()
+  const worksheets = sheets.map((s) => worksheetXml(s, usedNames)).join('\n ')
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
@@ -177,12 +213,7 @@ function buildSpreadsheetMl(
    <Interior ss:Color="#EEF2FF" ss:Pattern="Solid"/>
   </Style>
  </Styles>
- <Worksheet ss:Name="${safeSheet}">
-  <Table>
-   ${headerRow.replace(/<Cell>/g, '<Cell ss:StyleID="Header">')}
-   ${dataRows}
-  </Table>
- </Worksheet>
+ ${worksheets}
 </Workbook>`
 }
 
@@ -231,7 +262,55 @@ export function exportTasksToExcel({
   const headers = colDefs.map((c) => c.label)
   const dataRows = tasks.map((task) => colDefs.map((col) => cellValue(task, col.key)))
 
-  const xml = buildSpreadsheetMl(headers, dataRows, sheetName)
+  const xml = buildSpreadsheetMl([{ name: sheetName, headers, rows: dataRows }])
+  downloadXml(xml, fileName)
+}
+
+export interface ExportEmployeeTopTasksOptions {
+  from: string
+  to: string
+  byEmployee: EmployeeTopTasksReportEmployeeRow[]
+  /** File name without extension. */
+  fileName?: string
+}
+
+/** Format a day's top tasks as a numbered list for a single cell (top 3 max). */
+export function formatTopTaskList(tasks: EmployeeTopTaskItem[]): string {
+  if (!tasks.length) return ''
+  return tasks
+    .slice(0, 3)
+    .map((t, i) => `${i + 1}. ${t.title}${t.project_name ? ` (${t.project_name})` : ''}`)
+    .join('\n')
+}
+
+/**
+ * One sheet per employee with columns Date | Top 3 Tasks for the period.
+ * Employees with no marks still get a sheet so the report is complete.
+ */
+export function exportEmployeeTopTasksExcel({
+  from,
+  to,
+  byEmployee,
+  fileName,
+}: ExportEmployeeTopTasksOptions): void {
+  if (!byEmployee.length) {
+    throw new Error('No employees to export.')
+  }
+
+  const sheets: SpreadsheetSheet[] = byEmployee.map((employee) => {
+    const headers = ['Date', 'Top 3 Tasks']
+    const rows: Array<Array<string | number>> = employee.entries.length
+      ? employee.entries.map((entry) => [formatDate(entry.date), formatTopTaskList(entry.tasks)])
+      : [['—', 'No top tasks marked in this range']]
+
+    return { name: employee.employee_name, headers, rows }
+  })
+
+  const xml = buildSpreadsheetMl(sheets)
+  downloadXml(xml, fileName ?? `employee-top-tasks-${from}-to-${to}`)
+}
+
+function downloadXml(xml: string, fileName: string): void {
   // UTF-8 BOM helps Excel on Windows detect encoding correctly
   const bom = '\uFEFF'
   const blob = new Blob([bom + xml], {

@@ -16,6 +16,7 @@ import {
   UserCheck,
   UserCog,
   BadgeCheck,
+  FileSpreadsheet,
   Star,
   X,
 } from 'lucide-react'
@@ -38,6 +39,7 @@ const nav = [
   { to: '/admin/eas', label: 'EA Accounts', icon: UserCheck },
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { to: '/admin/top-tasks', label: 'Top Tasks', icon: Star },
+  { to: '/admin/employee-tasks', label: 'Employee Tasks', icon: FileSpreadsheet },
   { to: '/admin/activity-logs', label: 'Activity Logs', icon: Activity },
   { to: '/admin/work-report', label: 'Work Report', icon: BarChart3 },
   { to: '/admin/settings', label: 'Settings', icon: Settings },

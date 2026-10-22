@@ -314,6 +314,47 @@ export interface WorkReport {
   default_employee_id?: number
 }
 
+// ─── Employee Top-Tasks report (admin portal) ───────────────────────────────
+
+export interface EmployeeTopTaskItem {
+  id: number
+  title: string
+  project_id: number
+  project_name: string | null
+  status: TaskStatus
+  priority: TaskPriority
+}
+
+export interface EmployeeTopTaskEntry {
+  /** Y-m-d the task was marked as Top. */
+  date: string
+  task_count: number
+  tasks: EmployeeTopTaskItem[]
+}
+
+export interface EmployeeTopTasksReportEmployeeRow {
+  employee_id: number
+  employee_name: string
+  department: string | null
+  designation: string | null
+  marked_days: number
+  top_task_count: number
+  entries: EmployeeTopTaskEntry[]
+}
+
+export interface EmployeeTopTasksReport {
+  from: string
+  to: string
+  summary: {
+    employees_count: number
+    employees_with_marks: number
+    employees_without_marks: number
+    top_task_total: number
+    days_with_marks: number
+  }
+  by_employee: EmployeeTopTasksReportEmployeeRow[]
+}
+
 export const TASK_STATUSES: { value: TaskStatus; label: string; color: string }[] = [
   { value: 'todo', label: 'To Do', color: 'bg-slate-100 text-slate-700 border-slate-200' },
   { value: 'discussion', label: 'Discussion', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },
