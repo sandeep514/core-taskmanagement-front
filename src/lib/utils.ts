@@ -19,6 +19,17 @@ export function parseDate(date: string | Date | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+/** Compact duration for an estimate stored in minutes, e.g. 90 → "1h 30m". */
+export function formatEstimateDuration(minutes: number | null | undefined): string {
+  const total = Math.round(Number(minutes) || 0)
+  if (total <= 0) return '0m'
+  const hours = Math.floor(total / 60)
+  const mins = total % 60
+  if (hours === 0) return `${mins}m`
+  if (mins === 0) return `${hours}h`
+  return `${hours}h ${mins}m`
+}
+
 export function formatDate(date: string | Date | null | undefined, fallback = '—') {
   const d = parseDate(date)
   if (!d) return fallback

@@ -1,7 +1,6 @@
 import { CalendarClock, Star } from 'lucide-react'
 import { TOP_TASKS_DAILY_MIN } from '@/types'
-import { cn } from '@/lib/utils'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate, formatEstimateDuration } from '@/lib/utils'
 
 interface TopTasksNudgeProps {
   /** Global total across all projects (assigned to me) for today. This is what the min applies to. */
@@ -11,17 +10,45 @@ interface TopTasksNudgeProps {
   compact?: boolean
   /** Optional per-project count to show as context, e.g. 1 in this project of 3 total. */
   projectMarked?: number
+  /** Estimate minutes on today's Top tasks (same scope as `marked`). */
+  estimateMinutes?: number | null
+  /** Estimate minutes on this project's Top tasks (same scope as `projectMarked`). */
+  projectEstimateMinutes?: number | null
   /** Last working date (backfill) — shown only while its Top set is incomplete. */
   lastDate?: string | null
   lastMarked?: number | null
+  /** Estimate minutes on the last working date's Top tasks. */
+  lastEstimateMinutes?: number | null
 }
 
-export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, compact = false, projectMarked, lastDate, lastMarked }: TopTasksNudgeProps) {
+export function TopTasksNudge({
+  marked,
+  min = TOP_TASKS_DAILY_MIN,
+  className,
+  compact = false,
+  projectMarked,
+  estimateMinutes,
+  projectEstimateMinutes,
+  lastDate,
+  lastMarked,
+  lastEstimateMinutes,
+}: TopTasksNudgeProps) {
   const done = marked >= min
   const pct = Math.min(100, Math.round((marked / min) * 100))
   // Last date needs attention only while its Top-3 set is incomplete.
   const lastPending =
     lastDate != null && lastMarked != null && lastMarked < min
+  const showProjectSplit = projectMarked !== undefined && projectMarked !== marked
+  const totalTime =
+    estimateMinutes != null && marked > 0 ? formatEstimateDuration(estimateMinutes) : null
+  const projectTime =
+    projectEstimateMinutes != null && projectMarked != null && projectMarked > 0
+      ? formatEstimateDuration(projectEstimateMinutes)
+      : null
+  const lastTime =
+    lastEstimateMinutes != null && (lastMarked ?? 0) > 0
+      ? formatEstimateDuration(lastEstimateMinutes)
+      : null
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -48,16 +75,19 @@ export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, co
           {done ? (
             <span className="text-emerald-900">
               {marked} Top {marked === 1 ? 'task' : 'tasks'} marked for today
+              {totalTime ? ` · ${totalTime}` : ''}
             </span>
           ) : (
             <span className="text-amber-900">
               {marked}/{min} Top tasks marked — pick at least {min - marked} more
+              {totalTime ? ` · ${totalTime}` : ''}
             </span>
           )}
         </p>
-        {projectMarked !== undefined && projectMarked !== marked && (
+        {showProjectSplit && (
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {projectMarked} in this project · {marked} total across all projects
+            {projectMarked} in this project{projectTime ? ` · ${projectTime}` : ''} · {marked} total
+            across all projects
           </p>
         )}
         {!compact && (
@@ -74,14 +104,14 @@ export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, co
             {!done && (
               <p className="mt-1 text-xs text-amber-800/80">
                 Star your most important tasks so the day stays focused. You can mark more than {min}.
-                Total counts across all projects.
+                Total counts and estimated time are across all projects.
               </p>
             )}
           </>
         )}
         {compact && projectMarked !== undefined && projectMarked !== marked && (
           <p className="mt-1 text-xs text-muted-foreground">
-            Total counts across all projects.
+            Total counts and estimated time are across all projects.
           </p>
         )}
       </div>
@@ -98,6 +128,7 @@ export function TopTasksNudge({ marked, min = TOP_TASKS_DAILY_MIN, className, co
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-tight text-orange-900">
             {lastMarked}/{min} Top tasks for {formatDate(lastDate)} — mark {min - (lastMarked ?? 0)} more
+            {lastTime ? ` · ${lastTime}` : ''}
           </p>
           <p className="mt-0.5 text-xs text-orange-800/80">
             Missed the last working day? Star a task and choose the last date to backfill.

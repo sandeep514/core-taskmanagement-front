@@ -5,7 +5,7 @@ import { ArrowLeft, ListPlus, Plus } from 'lucide-react'
 import { fetchProject, fetchProjectTasks, portalUiBase } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import type { Task } from '@/types'
-import { countTopToday, isTopToday } from '@/types'
+import { countTopToday, isTopToday, sumTopEstimateToday } from '@/types'
 import { TopTasksNudge } from '@/components/tasks/TopTasksNudge'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
@@ -63,6 +63,7 @@ export function AdminProjectBoardPage() {
     return filterTasksByPriorityAndType(list, priorityFilter, taskTypeFilter, search)
   }, [tasks, priorityFilter, taskTypeFilter, search, topOnly])
   const boardTopCount = countTopToday(tasks ?? [])
+  const boardEstimate = sumTopEstimateToday(tasks ?? [])
 
   if (loadingProject || loadingTasks) return <PageLoader />
 
@@ -153,7 +154,7 @@ export function AdminProjectBoardPage() {
       </div>
 
       <div className="mb-4 max-w-md">
-        <TopTasksNudge marked={boardTopCount} compact />
+        <TopTasksNudge marked={boardTopCount} estimateMinutes={boardEstimate} compact />
       </div>
 
       <KanbanBoard projectId={id} tasks={filteredTasks} onTaskClick={openDetail} />

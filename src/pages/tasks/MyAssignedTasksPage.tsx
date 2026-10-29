@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { bulkDeactivateTasks, fetchCopyTargetProjects, fetchMyAssignedTasks, updateTaskStatus } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import type { Task, TaskStatus } from '@/types'
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, countTopOnDate, countTopToday, isTopOnDate, isTopToday } from '@/types'
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES, countTopOnDate, countTopToday, isTopOnDate, isTopToday, sumTopEstimateOnDate, sumTopEstimateToday } from '@/types'
 import {
   allowedTaskStatusesForUser,
   canChangeTaskStatus,
@@ -162,6 +162,8 @@ export function MyAssignedTasksPage() {
       urgent: list.filter((t) => t.priority === 'urgent' && t.status !== 'done').length,
       topToday: topTodayCount,
       topLast: topLastCount,
+      estimateToday: todayKeyVal ? sumTopEstimateOnDate(list, todayKeyVal) : sumTopEstimateToday(list),
+      estimateLast: lastDateVal ? sumTopEstimateOnDate(list, lastDateVal) : 0,
       lastDate: lastDateVal ?? null,
       lastEligible: topStatus?.last_eligible ?? false,
       minRequired: topStatus?.min_required ?? 3,
@@ -333,9 +335,11 @@ export function MyAssignedTasksPage() {
         <div className="max-w-md">
           <TopTasksNudge
             marked={stats.topToday}
+            estimateMinutes={stats.estimateToday}
             min={stats.minRequired}
             lastDate={stats.lastDate}
             lastMarked={stats.topLast}
+            lastEstimateMinutes={stats.estimateLast}
           />
         </div>
         <div className="relative max-w-md">

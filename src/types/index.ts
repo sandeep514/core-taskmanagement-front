@@ -486,6 +486,26 @@ export function countTopOnDate<
   return tasks.filter((t) => isTopOnDate(t, date)).length
 }
 
+type TopEstimateTask = {
+  is_top_task?: boolean | null
+  top_task_date?: string | null
+  estimate_minutes?: number | null
+}
+
+/** Sum of estimate minutes on Top tasks for an explicit date. */
+export function sumTopEstimateOnDate<T extends TopEstimateTask>(tasks: T[], date: string): number {
+  return tasks.reduce((sum, task) => {
+    if (!isTopOnDate(task, date)) return sum
+    const minutes = Number(task.estimate_minutes)
+    return sum + (Number.isFinite(minutes) && minutes > 0 ? minutes : 0)
+  }, 0)
+}
+
+/** Sum of estimate minutes on today's Top tasks. */
+export function sumTopEstimateToday<T extends TopEstimateTask>(tasks: T[]): number {
+  return sumTopEstimateOnDate(tasks, todayKey())
+}
+
 export interface LoginResponse {
   token: string
   user: AuthUser
