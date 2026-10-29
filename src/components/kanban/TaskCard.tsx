@@ -10,7 +10,6 @@ import { claimTask, toggleTaskTop } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import {
   cn,
-  canMarkTopForDate,
   formatDate,
   formatTaskAssignees,
   formatTaskCreatedAt,
@@ -69,11 +68,12 @@ export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' |
     qc.invalidateQueries({ queryKey: ['top-tasks'] })
   }
   const mutation = useMutation({
-    mutationFn: (date?: string) =>
+    mutationFn: (payload?: { date?: string; estimateMinutes?: number }) =>
       toggleTaskTop(
         task.id,
         topToday || topLast ? false : true,
-        topToday || topLast ? (topToday ? today : lastDate) ?? undefined : date,
+        topToday || topLast ? (topToday ? today : lastDate) ?? undefined : payload?.date,
+        topToday || topLast ? undefined : payload?.estimateMinutes,
       ),
     onSuccess: (updated) => {
       setDateOpen(false)
@@ -93,25 +93,16 @@ export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' |
       mutation.mutate(undefined)
       return
     }
-    // Marking: ask for last date + today when backfill is still open for this
-    // task; otherwise mark today directly.
-    const canBackfill =
-      Boolean(lastDate) &&
-      Boolean(topStatus?.last_eligible) &&
-      canMarkTopForDate(task, user, lastDate!)
-    if (canBackfill && today) {
-      setDateOpen(true)
-      return
-    }
-    mutation.mutate(today)
+    // Marking always asks for the date (when backfill is open) and an estimate.
+    setDateOpen(true)
   }
 
   return (
     <>
       <button
         type="button"
-        title={topToday || topLast ? 'Remove from Top tasks' : 'Mark as Top task (choose date)'}
-        aria-label={topToday || topLast ? 'Remove from Top tasks' : 'Mark as Top task (choose date)'}
+        title={topToday || topLast ? 'Remove from Top tasks' : 'Mark as Top task'}
+        aria-label={topToday || topLast ? 'Remove from Top tasks' : 'Mark as Top task'}
         aria-pressed={topToday || topLast}
         disabled={mutation.isPending}
         onPointerDown={(e) => e.stopPropagation()}
@@ -134,7 +125,7 @@ export function TopStarButton({ task, size = 'sm' }: { task: Task; size?: 'sm' |
         status={topStatus}
         defaultDate={today}
         pending={mutation.isPending}
-        onConfirm={(date) => mutation.mutate(date)}
+        onConfirm={(date, estimateMinutes) => mutation.mutate({ date, estimateMinutes })}
       />
     </>
   )

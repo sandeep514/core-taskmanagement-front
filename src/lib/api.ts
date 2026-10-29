@@ -621,15 +621,19 @@ export async function claimTask(taskId: number): Promise<Task> {
   return data
 }
 
-/** Mark / unmark a task as Top for today or the last working date (backfill). Pass explicit value or omit to toggle. */
+/** Mark / unmark a task as Top for today or the last working date (backfill). Pass explicit value or omit to toggle. Marking requires estimate_minutes. */
 export async function toggleTaskTop(
   taskId: number,
   is_top_task?: boolean,
   top_task_date?: string | null,
+  estimate_minutes?: number | null,
 ): Promise<Task> {
   const { data } = await api.patch<Task>(`/${portalBase()}/tasks/${taskId}/top`, {
     ...(is_top_task === undefined ? {} : { is_top_task }),
     ...(top_task_date ? { top_task_date } : {}),
+    ...(estimate_minutes != null && !Number.isNaN(estimate_minutes)
+      ? { estimate_minutes }
+      : {}),
   })
   return data
 }

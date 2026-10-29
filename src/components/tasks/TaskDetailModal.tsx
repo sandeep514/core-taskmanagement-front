@@ -51,7 +51,6 @@ function isImageAttachment(a: {
 import {
   canDeleteTaskAttachment,
   canEditTask,
-  canMarkTopForDate,
   canToggleTopTask,
   cn,
   formatDate,
@@ -195,7 +194,7 @@ export function TaskDetailModal({
   })
 
   const topMutation = useMutation({
-    mutationFn: (date?: string) => {
+    mutationFn: (payload?: { date?: string; estimateMinutes?: number }) => {
       const today = topStatus?.today
       const lastDate = topStatus?.last_date
       const markedToday = today ? isTopOnDate(task!, today) : isTopToday(task!)
@@ -204,7 +203,8 @@ export function TaskDetailModal({
       return toggleTaskTop(
         taskId!,
         unmarking ? false : true,
-        unmarking ? (markedToday ? today : lastDate) ?? undefined : date,
+        unmarking ? (markedToday ? today : lastDate) ?? undefined : payload?.date,
+        unmarking ? undefined : payload?.estimateMinutes,
       )
     },
     onSuccess: (updated) => {
@@ -241,15 +241,7 @@ export function TaskDetailModal({
       topMutation.mutate(undefined)
       return
     }
-    const canBackfill =
-      Boolean(lastDateVal) &&
-      Boolean(topStatus?.last_eligible) &&
-      canMarkTopForDate(task, user, lastDateVal!)
-    if (canBackfill && todayKeyVal) {
-      setDateOpen(true)
-      return
-    }
-    topMutation.mutate(todayKeyVal)
+    setDateOpen(true)
   }
 
   const priority = TASK_PRIORITIES.find((p) => p.value === task?.priority)
@@ -289,7 +281,7 @@ export function TaskDetailModal({
                       className={cn(
                         isMarked && 'bg-amber-500 hover:bg-amber-600 text-white border-transparent',
                       )}
-                      title={isMarked ? 'Remove from Top tasks' : 'Mark as Top task (choose date)'}
+                      title={isMarked ? 'Remove from Top tasks' : 'Mark as Top task'}
                     >
                       <Star className="h-3.5 w-3.5" fill={isMarked ? 'currentColor' : 'none'} />
                       {topLast
@@ -829,7 +821,7 @@ export function TaskDetailModal({
       status={topStatus}
       defaultDate={todayKeyVal}
       pending={topMutation.isPending}
-      onConfirm={(date) => topMutation.mutate(date)}
+      onConfirm={(date, estimateMinutes) => topMutation.mutate({ date, estimateMinutes })}
     />
 
     <Dialog

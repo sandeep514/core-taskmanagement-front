@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarDays, History } from 'lucide-react'
 import type { Task } from '@/types'
 import { TOP_TASKS_DAILY_MIN } from '@/types'
-import { formatDate } from '@/lib/utils'
 import type { MyTopStatus } from '@/lib/api'
+import { canMarkTopForDate, cn, formatDate } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface TopDateDialogProps {
   open: boolean
@@ -21,13 +23,19 @@ interface TopDateDialogProps {
   status: MyTopStatus | null | undefined
   defaultDate?: string | null
   pending?: boolean
-  onConfirm: (date: string) => void
+  onConfirm: (date: string, estimateMinutes: number) => void
+}
+
+function parseEstimateMinutes(raw: string): number | null {
+  const n = Number(raw.trim())
+  if (!Number.isFinite(n) || n <= 0 || n > 5999999) return null
+  return Math.round(n * 100) / 100
 }
 
 /**
- * Date choice shown when marking a Top-3 task: Today always, plus the last
- * working date (e.g. Saturday when today is Monday) — but the last date is
- * only shown while its Top-3 set is still incomplete (< min required).
+ * Shown when marking a Top-3 task. Asks which day the mark counts for
+ * (today, plus the last working date while that day's set is still
+ * incomplete) and requires an estimate in minutes, saved on the task.
  */
 export function TopDateDialog({
   open,
@@ -43,11 +51,32 @@ export function TopDateDialog({
   const min = status?.min_required ?? TOP_TASKS_DAILY_MIN
   const todayCount = status?.today_count ?? 0
   const lastCount = status?.last_count ?? 0
-  // Last date is offered only when its 3-task set is not yet complete.
-  const showLast = Boolean(lastDate && lastDate !== today && lastCount < min)
+  const user = useAuthStore((s) => s.user)
+  // Last date is offered only when its 3-task set is incomplete and this
+  // task is allowed to be marked for that date (history locks the other day).
+  const showLast = Boolean(
+    task &&
+      lastDate &&
+      lastDate !== today &&
+      lastCount < min &&
+      canMarkTopForDate(task, user, lastDate),
+  )
 
   const [picked, setPicked] = useState<string | null>(null)
+  const [estimate, setEstimate] = useState('')
   const selected = picked ?? defaultDate ?? today
+  const estimateMinutes = parseEstimateMinutes(estimate)
+  const estimateInvalid = estimate.trim() !== '' && estimateMinutes === null
+
+  useEffect(() => {
+    if (!open) {
+      setPicked(null)
+      setEstimate('')
+      return
+    }
+    const existing = task?.estimate_minutes
+    setEstimate(existing != null && Number(existing) > 0 ? String(existing) : '')
+  }, [open, task?.id, task?.estimate_minutes])
 
   const pick = (date: string) => setPicked(date)
 
@@ -65,7 +94,7 @@ export function TopDateDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader>
-          <DialogTitle>Mark Top 3 — choose date</DialogTitle>
+          <DialogTitle>Mark Top 3</DialogTitle>
         </DialogHeader>
         <div className="space-y-2 py-1">
           <p className="text-sm text-muted-foreground">
@@ -153,14 +182,38 @@ export function TopDateDialog({
               today can be marked.
             </p>
           )}
+
+          <div className="space-y-1.5 pt-1">
+            <Label htmlFor={`top-estimate-minutes-${task?.id ?? 'new'}`}>Estimate time (minutes)</Label>
+            <Input
+              id={`top-estimate-minutes-${task?.id ?? 'new'}`}
+              type="number"
+              min={1}
+              step="any"
+              inputMode="decimal"
+              placeholder="e.g. 90"
+              value={estimate}
+              onChange={(e) => setEstimate(e.target.value)}
+              disabled={pending}
+              autoFocus
+            />
+            <p className={cn('text-xs', estimateInvalid ? 'text-red-600' : 'text-muted-foreground')}>
+              {estimateInvalid
+                ? 'Enter a time greater than 0 minutes.'
+                : 'Required. This is saved as the task estimate.'}
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(selected || today)}
-            disabled={pending || !selected}
+            onClick={() => {
+              if (estimateMinutes === null) return
+              onConfirm(selected || today, estimateMinutes)
+            }}
+            disabled={pending || !selected || estimateMinutes === null}
             className="bg-amber-500 hover:bg-amber-600 text-white"
           >
             {pending ? 'Marking…' : `Mark for ${selected === lastDate ? 'last date' : 'today'}`}

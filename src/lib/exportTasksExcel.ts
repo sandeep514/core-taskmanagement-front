@@ -279,7 +279,11 @@ export function formatTopTaskList(tasks: EmployeeTopTaskItem[]): string {
   if (!tasks.length) return ''
   return tasks
     .slice(0, 3)
-    .map((t, i) => `${i + 1}. ${t.title}${t.project_name ? ` (${t.project_name})` : ''}`)
+    .map((t, i) => {
+      const project = t.project_name ? ` (${t.project_name})` : ''
+      const estimate = t.estimate_minutes != null ? ` · ${t.estimate_minutes}m` : ''
+      return `${i + 1}. ${t.title}${project}${estimate}`
+    })
     .join('\n')
 }
 

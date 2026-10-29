@@ -35,6 +35,9 @@ function TaskList({ tasks }: { tasks: EmployeeTopTaskItem[] }) {
             {task.project_name ? (
               <span className="text-muted-foreground"> · {task.project_name}</span>
             ) : null}
+            {task.estimate_minutes != null ? (
+              <span className="text-muted-foreground"> · {task.estimate_minutes}m</span>
+            ) : null}
             <span className="ml-1.5 inline-flex gap-1 align-middle">
               {status && (
                 <span

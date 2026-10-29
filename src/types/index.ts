@@ -323,6 +323,7 @@ export interface EmployeeTopTaskItem {
   project_name: string | null
   status: TaskStatus
   priority: TaskPriority
+  estimate_minutes?: number | null
 }
 
 export interface EmployeeTopTaskEntry {
