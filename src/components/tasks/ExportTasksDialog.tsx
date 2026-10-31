@@ -79,20 +79,22 @@ export function ExportTasksDialog({
     const columns = EXPORT_COLUMNS.map((c) => c.key).filter((k) => selected.has(k))
 
     setExporting(true)
-    try {
-      exportTasksToExcel({
-        tasks,
-        columns,
-        fileName,
-        sheetName: contextLabel?.slice(0, 31) || 'Tasks',
-      })
-      toast.success(`Exported ${tasks.length} task${tasks.length === 1 ? '' : 's'} to Excel.`)
-      onOpenChange(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
-    } finally {
-      setExporting(false)
-    }
+    void (async () => {
+      try {
+        await exportTasksToExcel({
+          tasks,
+          columns,
+          fileName,
+          sheetName: contextLabel?.slice(0, 31) || 'Tasks',
+        })
+        toast.success(`Exported ${tasks.length} task${tasks.length === 1 ? '' : 's'} to Excel.`)
+        onOpenChange(false)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
+      } finally {
+        setExporting(false)
+      }
+    })()
   }
 
   return (

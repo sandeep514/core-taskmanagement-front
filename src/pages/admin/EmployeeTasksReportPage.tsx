@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { CalendarRange, FileSpreadsheet, ListTodo, Search, Users } from 'lucide-react'
 import { fetchEmployeeTopTasksReport } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
@@ -100,11 +101,13 @@ export function EmployeeTasksReportPage() {
 
   const handleExport = () => {
     if (!data) return
-    exportEmployeeTopTasksExcel({
+    void exportEmployeeTopTasksExcel({
       from: data.from,
       to: data.to,
       byEmployee: data.by_employee,
       fileName: `employee-top-tasks-${data.from}-to-${data.to}`,
+    }).catch((err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
     })
   }
 
@@ -112,7 +115,7 @@ export function EmployeeTasksReportPage() {
     <div>
       <PageHeader
         title="Employee Tasks"
-        description="Each employee's Top tasks in the From–To range. Export gives one Excel sheet per employee, with the range at the top, one row per task, the estimate time, and a date filter."
+        description="Each employee's Top tasks in the From–To range. The .xlsx export has one sheet per employee, with the employee name and date range at the top, one row per task, the estimate time, and a date filter."
         actions={
           <Button
             type="button"

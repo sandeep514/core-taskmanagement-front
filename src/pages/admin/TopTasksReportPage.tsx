@@ -158,7 +158,7 @@ export function TopTasksReportPage() {
     <div>
       <PageHeader
         title="Top Tasks Report"
-        description="Every task employees marked as a Top task between the selected dates."
+        description="Every task employees marked as a Top task between the selected dates. Export is an .xlsx file with one sheet per employee."
         actions={
           <Button
             type="button"
@@ -166,19 +166,21 @@ export function TopTasksReportPage() {
             disabled={!rows.length}
             title={rows.length ? 'Export tasks to Excel' : 'No tasks to export'}
             onClick={() => {
-              try {
-                exportTopTasksReportExcel({
-                  tasks: rows,
-                  from,
-                  to,
-                  fileName: `top-tasks-${from}-to-${to}`,
-                })
-                toast.success(
-                  `Exported ${rows.length} task${rows.length === 1 ? '' : 's'} to Excel.`,
-                )
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
-              }
+              void (async () => {
+                try {
+                  await exportTopTasksReportExcel({
+                    tasks: rows,
+                    from,
+                    to,
+                    fileName: `top-tasks-${from}-to-${to}`,
+                  })
+                  toast.success(
+                    `Exported ${rows.length} task${rows.length === 1 ? '' : 's'} to Excel.`,
+                  )
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
+                }
+              })()
             }}
           >
             <FileSpreadsheet className="h-4 w-4" />

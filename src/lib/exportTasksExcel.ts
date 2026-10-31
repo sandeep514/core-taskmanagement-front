@@ -135,28 +135,7 @@ function cellValue(task: Task, key: ExportColumnKey): string | number {
   }
 }
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
-
 type SheetCell = string | number | { date: string }
-
-function cellXml(value: SheetCell): string {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`
-  }
-  if (value && typeof value === 'object' && value.date) {
-    const iso = String(value.date).slice(0, 10)
-    return `<Cell ss:StyleID="Date"><Data ss:Type="DateTime">${iso}T00:00:00.000</Data></Cell>`
-  }
-  const text = escapeXml(String(value ?? ''))
-  return `<Cell><Data ss:Type="String">${text}</Data></Cell>`
-}
 
 export interface SpreadsheetSheet {
   name: string
@@ -183,63 +162,6 @@ function sanitizeSheetName(raw: string, used: Set<string>): string {
   return candidate
 }
 
-function worksheetXml(sheet: SpreadsheetSheet, usedNames: Set<string>): string {
-  const safeSheet = escapeXml(sanitizeSheetName(sheet.name, usedNames))
-  const leading = sheet.leadingRows ?? []
-  const leadingXml = leading
-    .map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`)
-    .join('')
-  const spacer = leading.length ? '<Row/>' : ''
-  const headerRowIndex = leading.length === 0 ? 1 : leading.length + 2
-  const lastRow = headerRowIndex + sheet.rows.length
-  const headerRow = `<Row>${sheet.headers.map((h) => cellXml(h)).join('')}</Row>`
-  const dataRows = sheet.rows
-    .map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`)
-    .join('')
-  const autoFilter = sheet.autoFilter
-    ? `<AutoFilter x:Range="R${headerRowIndex}C1:R${Math.max(lastRow, headerRowIndex)}C${sheet.headers.length}" xmlns="urn:schemas-microsoft-com:office:excel"/>`
-    : ''
-
-  return `<Worksheet ss:Name="${safeSheet}">
-  <Table>
-   ${leadingXml}
-   ${spacer}
-   ${headerRow.replace(/<Cell>/g, '<Cell ss:StyleID="Header">')}
-   ${dataRows}
-  </Table>
-  ${autoFilter}
- </Worksheet>`
-}
-
-/**
- * Build Excel-compatible SpreadsheetML (opens in Excel / LibreOffice / Google Sheets).
- * Zero runtime dependencies — avoids fragile xlsx package installs on deploy servers.
- * Supports one or many worksheets (one sheet per employee, etc.).
- */
-function buildSpreadsheetMl(sheets: SpreadsheetSheet[]): string {
-  const usedNames = new Set<string>()
-  const worksheets = sheets.map((s) => worksheetXml(s, usedNames)).join('\n ')
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
- <Styles>
-  <Style ss:ID="Header">
-   <Font ss:Bold="1"/>
-   <Interior ss:Color="#EEF2FF" ss:Pattern="Solid"/>
-  </Style>
-  <Style ss:ID="Date">
-   <NumberFormat ss:Format="dd-mmm-yyyy"/>
-  </Style>
- </Styles>
- ${worksheets}
-</Workbook>`
-}
-
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -253,6 +175,82 @@ function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
+function columnLetter(index: number): string {
+  let n = index
+  let letters = ''
+  while (n > 0) {
+    const rem = (n - 1) % 26
+    letters = String.fromCharCode(65 + rem) + letters
+    n = Math.floor((n - 1) / 26)
+  }
+  return letters
+}
+
+function parseSheetDate(iso: string): Date {
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  return new Date(year, (month || 1) - 1, day || 1)
+}
+
+/** Real .xlsx workbook so sheet tabs (employee names) open in Excel. */
+async function downloadXlsx(sheets: SpreadsheetSheet[], fileName: string): Promise<void> {
+  const loaded = await import('exceljs')
+  const namespaced = loaded as typeof import('exceljs') & { default?: typeof import('exceljs') }
+  const ExcelJS = typeof namespaced.Workbook === 'function' ? namespaced : namespaced.default!
+  const workbook = new ExcelJS.Workbook()
+  const usedNames = new Set<string>()
+
+  for (const sheet of sheets) {
+    const worksheet = workbook.addWorksheet(sanitizeSheetName(sheet.name, usedNames))
+    const leading = sheet.leadingRows ?? []
+    for (const cells of leading) {
+      const row = worksheet.addRow(cells.map((cell) => (cell && typeof cell === 'object' ? parseSheetDate(cell.date) : cell)))
+      row.getCell(1).font = { bold: true }
+      cells.forEach((cell, index) => {
+        if (cell && typeof cell === 'object') {
+          row.getCell(index + 1).numFmt = 'dd-mmm-yyyy'
+        }
+      })
+    }
+    if (leading.length) worksheet.addRow([])
+
+    const header = worksheet.addRow(sheet.headers)
+    header.font = { bold: true }
+    header.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } }
+    })
+
+    for (const cells of sheet.rows) {
+      const row = worksheet.addRow(
+        cells.map((cell) => (cell && typeof cell === 'object' ? parseSheetDate(cell.date) : cell)),
+      )
+      cells.forEach((cell, index) => {
+        if (cell && typeof cell === 'object') {
+          row.getCell(index + 1).numFmt = 'dd-mmm-yyyy'
+        }
+      })
+    }
+
+    sheet.headers.forEach((label, index) => {
+      const width = Math.min(48, Math.max(14, label.length + 6))
+      worksheet.getColumn(index + 1).width = label === 'Title' || label === 'Task' ? 42 : width
+    })
+
+    if (sheet.autoFilter && sheet.headers.length) {
+      const headerRow = leading.length + 2
+      const lastRow = Math.max(headerRow, headerRow + sheet.rows.length)
+      const lastCol = columnLetter(sheet.headers.length)
+      worksheet.autoFilter = `A${headerRow}:${lastCol}${lastRow}`
+    }
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const safeName = fileName.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'tasks-export'
+  downloadBlob(blob, `${safeName}.xlsx`)
+}
+
 export interface ExportTasksOptions {
   tasks: Task[]
   columns: ExportColumnKey[]
@@ -261,30 +259,15 @@ export interface ExportTasksOptions {
   sheetName?: string
 }
 
-/**
- * Build and download an Excel-compatible spreadsheet for the given tasks and columns.
- * Uses SpreadsheetML (.xls) with no external packages.
- */
-/**
- * Top Tasks report: Date, Project, Title, Time.
- * Rows are ordered by date, then project, so tasks in the same group sit together.
- * Date and project are written once per group.
- */
-export function exportTopTasksReportExcel({
-  tasks,
-  from,
-  to,
-  fileName,
-}: {
-  tasks: Task[]
-  from: string
-  to: string
-  fileName?: string
-}): void {
-  if (!tasks.length) {
-    throw new Error('No tasks to export.')
-  }
+function taskEmployeeNames(task: Task): string[] {
+  const names = (task.assignees ?? []).map((person) => person.name).filter(Boolean)
+  if (names.length) return names
+  if (task.assignee?.name) return [task.assignee.name]
+  if (task.client_assignee?.name) return [`Client · ${task.client_assignee.name}`]
+  return ['Unassigned']
+}
 
+function groupedTopTaskRows(tasks: Task[]): SpreadsheetSheet['rows'] {
   const sorted = [...tasks].sort((a, b) => {
     const dateA = String(a.top_task_date ?? '').slice(0, 10)
     const dateB = String(b.top_task_date ?? '').slice(0, 10)
@@ -297,7 +280,7 @@ export function exportTopTasksReportExcel({
 
   let lastDate = ''
   let lastProject = ''
-  const rows: SpreadsheetSheet['rows'] = sorted.map((task) => {
+  return sorted.map((task) => {
     const date = String(task.top_task_date ?? '').slice(0, 10)
     const project = task.project?.project_name ?? `Project #${task.project_id}`
     const showDate = date !== lastDate
@@ -311,27 +294,60 @@ export function exportTopTasksReportExcel({
       estimateTimeCell(task.estimate_minutes),
     ]
   })
+}
 
-  const xml = buildSpreadsheetMl([
-    {
-      name: 'Top Tasks',
+/**
+ * Top Tasks report as .xlsx. One sheet per employee (sheet tab and a row
+ * inside the sheet). Columns are Date, Project, Title, Time, grouped by
+ * date then project.
+ */
+export async function exportTopTasksReportExcel({
+  tasks,
+  from,
+  to,
+  fileName,
+}: {
+  tasks: Task[]
+  from: string
+  to: string
+  fileName?: string
+}): Promise<void> {
+  if (!tasks.length) {
+    throw new Error('No tasks to export.')
+  }
+
+  const byEmployee = new Map<string, Task[]>()
+  for (const task of tasks) {
+    for (const name of taskEmployeeNames(task)) {
+      const list = byEmployee.get(name) ?? []
+      list.push(task)
+      byEmployee.set(name, list)
+    }
+  }
+
+  const sheets: SpreadsheetSheet[] = [...byEmployee.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, employeeTasks]) => ({
+      name,
       headers: ['Date', 'Project', 'Title', 'Time'],
-      rows,
+      rows: groupedTopTaskRows(employeeTasks),
       leadingRows: [
+        ['Employee', name],
         ['From', { date: from }],
         ['To', { date: to }],
       ],
-    },
-  ])
-  downloadXml(xml, fileName ?? `top-tasks-${from}-to-${to}`)
+      autoFilter: true,
+    }))
+
+  await downloadXlsx(sheets, fileName ?? `top-tasks-${from}-to-${to}`)
 }
 
-export function exportTasksToExcel({
+export async function exportTasksToExcel({
   tasks,
   columns,
   fileName = 'tasks-export',
   sheetName = 'Tasks',
-}: ExportTasksOptions): void {
+}: ExportTasksOptions): Promise<void> {
   if (!columns.length) {
     throw new Error('Select at least one column to export.')
   }
@@ -346,8 +362,7 @@ export function exportTasksToExcel({
   const headers = colDefs.map((c) => c.label)
   const dataRows = tasks.map((task) => colDefs.map((col) => cellValue(task, col.key)))
 
-  const xml = buildSpreadsheetMl([{ name: sheetName, headers, rows: dataRows }])
-  downloadXml(xml, fileName)
+  await downloadXlsx([{ name: sheetName, headers, rows: dataRows, autoFilter: true }], fileName)
 }
 
 export interface ExportEmployeeTopTasksOptions {
@@ -369,12 +384,12 @@ function estimateTimeCell(minutes: number | null | undefined): string {
  * Date column has Excel's filter so the range can be narrowed again.
  * Employees with no marks still get a sheet.
  */
-export function exportEmployeeTopTasksExcel({
+export async function exportEmployeeTopTasksExcel({
   from,
   to,
   byEmployee,
   fileName,
-}: ExportEmployeeTopTasksOptions): void {
+}: ExportEmployeeTopTasksOptions): Promise<void> {
   if (!byEmployee.length) {
     throw new Error('No employees to export.')
   }
@@ -400,22 +415,10 @@ export function exportEmployeeTopTasksExcel({
       name: employee.employee_name,
       headers,
       rows,
-      leadingRows: periodRows,
+      leadingRows: [['Employee', employee.employee_name], ...periodRows],
       autoFilter: true,
     }
   })
 
-  const xml = buildSpreadsheetMl(sheets)
-  downloadXml(xml, fileName ?? `employee-top-tasks-${from}-to-${to}`)
-}
-
-function downloadXml(xml: string, fileName: string): void {
-  // UTF-8 BOM helps Excel on Windows detect encoding correctly
-  const bom = '\uFEFF'
-  const blob = new Blob([bom + xml], {
-    type: 'application/vnd.ms-excel;charset=utf-8',
-  })
-
-  const safeName = fileName.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'tasks-export'
-  downloadBlob(blob, `${safeName}.xls`)
+  await downloadXlsx(sheets, fileName ?? `employee-top-tasks-${from}-to-${to}`)
 }
