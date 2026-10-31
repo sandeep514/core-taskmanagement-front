@@ -1,12 +1,9 @@
-import type {
-  EmployeeTopTaskItem,
-  EmployeeTopTasksReportEmployeeRow,
-  Task,
-} from '@/types'
+import type { EmployeeTopTasksReportEmployeeRow, Task } from '@/types'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import {
   formatDate,
   formatDateTime,
+  formatEstimateDuration,
   formatTaskCreatedAt,
   formatTaskCreator,
 } from '@/lib/utils'
@@ -274,22 +271,14 @@ export interface ExportEmployeeTopTasksOptions {
   fileName?: string
 }
 
-/** Format a day's top tasks as a numbered list for a single cell (top 3 max). */
-export function formatTopTaskList(tasks: EmployeeTopTaskItem[]): string {
-  if (!tasks.length) return ''
-  return tasks
-    .slice(0, 3)
-    .map((t, i) => {
-      const project = t.project_name ? ` (${t.project_name})` : ''
-      const estimate = t.estimate_minutes != null ? ` · ${t.estimate_minutes}m` : ''
-      return `${i + 1}. ${t.title}${project}${estimate}`
-    })
-    .join('\n')
+function estimateTimeCell(minutes: number | null | undefined): string {
+  if (minutes == null || !Number.isFinite(Number(minutes)) || Number(minutes) <= 0) return ''
+  return formatEstimateDuration(minutes)
 }
 
 /**
- * One sheet per employee with columns Date | Top 3 Tasks for the period.
- * Employees with no marks still get a sheet so the report is complete.
+ * One sheet per employee. Each Top task is its own row:
+ * Date | Task | Time. Employees with no marks still get a sheet.
  */
 export function exportEmployeeTopTasksExcel({
   from,
@@ -302,10 +291,16 @@ export function exportEmployeeTopTasksExcel({
   }
 
   const sheets: SpreadsheetSheet[] = byEmployee.map((employee) => {
-    const headers = ['Date', 'Top 3 Tasks']
+    const headers = ['Date', 'Task', 'Time']
     const rows: Array<Array<string | number>> = employee.entries.length
-      ? employee.entries.map((entry) => [formatDate(entry.date), formatTopTaskList(entry.tasks)])
-      : [['—', 'No top tasks marked in this range']]
+      ? employee.entries.flatMap((entry) =>
+          entry.tasks.map((task) => [
+            formatDate(entry.date),
+            task.project_name ? `${task.title} (${task.project_name})` : task.title,
+            estimateTimeCell(task.estimate_minutes),
+          ]),
+        )
+      : [['—', 'No top tasks marked in this range', '']]
 
     return { name: employee.employee_name, headers, rows }
   })

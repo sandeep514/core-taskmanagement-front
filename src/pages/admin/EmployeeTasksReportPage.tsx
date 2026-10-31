@@ -112,7 +112,7 @@ export function EmployeeTasksReportPage() {
     <div>
       <PageHeader
         title="Employee Tasks"
-        description="Each employee's Top-3 task list per day in the selected period. Export gives one Excel sheet per employee with Date and Top 3 Tasks columns."
+        description="Each employee's Top tasks per day in the selected period. Export gives one Excel sheet per employee, with one row per task and the estimate time in the next column."
         actions={
           <Button
             type="button"
