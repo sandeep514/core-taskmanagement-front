@@ -33,9 +33,9 @@ function parseEstimateMinutes(raw: string): number | null {
 }
 
 /**
- * Shown when marking a Top-3 task. Asks which day the mark counts for
- * (today, plus the last working date while that day's set is still
- * incomplete) and requires an estimate in minutes, saved on the task.
+ * Shown when marking a Top task. Asks which day the mark counts for
+ * (today, or the last working date — including after that day already has
+ * 3 marks) and requires an estimate in minutes, saved on the task.
  */
 export function TopDateDialog({
   open,
@@ -52,13 +52,12 @@ export function TopDateDialog({
   const todayCount = status?.today_count ?? 0
   const lastCount = status?.last_count ?? 0
   const user = useAuthStore((s) => s.user)
-  // Last date is offered only when its 3-task set is incomplete and this
-  // task is allowed to be marked for that date (history locks the other day).
+  // Previous working day stays available after 3 marks. History on this
+  // task can still lock it to one of the two dates.
   const showLast = Boolean(
     task &&
       lastDate &&
       lastDate !== today &&
-      lastCount < min &&
       canMarkTopForDate(task, user, lastDate),
   )
 
@@ -129,7 +128,7 @@ export function TopDateDialog({
                     Last date — {formatDate(lastDate)}
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    Missed yesterday? Backfill here · {lastCount}/{min} marked
+                    Last working day · {lastCount} marked · more than {min} is allowed
                   </span>
                 </span>
                 <span
@@ -175,13 +174,6 @@ export function TopDateDialog({
               </span>
             </button>
           </div>
-
-          {!showLast && lastDate && lastDate !== today && (
-            <p className="text-xs text-muted-foreground">
-              Last date ({formatDate(lastDate)}) already has {lastCount}/{min} Top tasks — only
-              today can be marked.
-            </p>
-          )}
 
           <div className="space-y-1.5 pt-1">
             <Label htmlFor={`top-estimate-minutes-${task?.id ?? 'new'}`}>Estimate time (minutes)</Label>

@@ -644,14 +644,13 @@ export interface MyTopStatus {
   min_required: number
   today_count: number
   last_count: number
-  /** True while the last date's Top set is still incomplete (< min). */
+  /** True when the previous working day can still be marked (no cap at 3). */
   last_eligible: boolean
 }
 
 /**
  * Current user's Top compliance for today + last working date (employee /
- * client portals). The last date is only offered while its Top-3 set is
- * incomplete — callers hide the "last date" option otherwise.
+ * client portals). The previous day stays available after 3 marks.
  */
 export async function fetchMyTopStatus(): Promise<MyTopStatus> {
   const { data } = await api.get<MyTopStatus>(`/${portalBase()}/my-top-status`)

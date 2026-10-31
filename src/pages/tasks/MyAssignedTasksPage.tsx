@@ -187,7 +187,7 @@ export function MyAssignedTasksPage() {
     setTopFilterDate(null)
   }
 
-  /** Clicking the Top 3 pill asks for the date: last date + today (last only while incomplete). */
+  /** Clicking the Top 3 pill asks for the date: last working day + today. */
   const handleTopPillClick = () => {
     if (topFilterDate) {
       setTopFilterDate(null)
