@@ -265,6 +265,67 @@ export interface ExportTasksOptions {
  * Build and download an Excel-compatible spreadsheet for the given tasks and columns.
  * Uses SpreadsheetML (.xls) with no external packages.
  */
+/**
+ * Top Tasks report: Date, Project, Title, Time.
+ * Rows are ordered by date, then project, so tasks in the same group sit together.
+ * Date and project are written once per group.
+ */
+export function exportTopTasksReportExcel({
+  tasks,
+  from,
+  to,
+  fileName,
+}: {
+  tasks: Task[]
+  from: string
+  to: string
+  fileName?: string
+}): void {
+  if (!tasks.length) {
+    throw new Error('No tasks to export.')
+  }
+
+  const sorted = [...tasks].sort((a, b) => {
+    const dateA = String(a.top_task_date ?? '').slice(0, 10)
+    const dateB = String(b.top_task_date ?? '').slice(0, 10)
+    if (dateA !== dateB) return dateA.localeCompare(dateB)
+    const projectA = a.project?.project_name ?? ''
+    const projectB = b.project?.project_name ?? ''
+    if (projectA !== projectB) return projectA.localeCompare(projectB)
+    return a.title.localeCompare(b.title)
+  })
+
+  let lastDate = ''
+  let lastProject = ''
+  const rows: SpreadsheetSheet['rows'] = sorted.map((task) => {
+    const date = String(task.top_task_date ?? '').slice(0, 10)
+    const project = task.project?.project_name ?? `Project #${task.project_id}`
+    const showDate = date !== lastDate
+    const showProject = showDate || project !== lastProject
+    lastDate = date
+    lastProject = project
+    return [
+      showDate && date ? { date } : '',
+      showProject ? project : '',
+      task.title,
+      estimateTimeCell(task.estimate_minutes),
+    ]
+  })
+
+  const xml = buildSpreadsheetMl([
+    {
+      name: 'Top Tasks',
+      headers: ['Date', 'Project', 'Title', 'Time'],
+      rows,
+      leadingRows: [
+        ['From', { date: from }],
+        ['To', { date: to }],
+      ],
+    },
+  ])
+  downloadXml(xml, fileName ?? `top-tasks-${from}-to-${to}`)
+}
+
 export function exportTasksToExcel({
   tasks,
   columns,

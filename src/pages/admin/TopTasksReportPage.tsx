@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, CheckCircle2, CircleAlert, Star, UserRoundX } from 'lucide-react'
+import { CalendarDays, CheckCircle2, CircleAlert, FileSpreadsheet, Star, UserRoundX } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   fetchEmployees,
   fetchProjects,
@@ -35,7 +36,7 @@ import { PageLoader } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
-import { ExportTasksButton } from '@/components/tasks/ExportTasksDialog'
+import { exportTopTasksReportExcel } from '@/lib/exportTasksExcel'
 
 export function TopTasksReportPage() {
   const user = useAuthStore((s) => s.user)
@@ -159,11 +160,30 @@ export function TopTasksReportPage() {
         title="Top Tasks Report"
         description="Every task employees marked as a Top task between the selected dates."
         actions={
-          <ExportTasksButton
-            tasks={rows}
-            fileName={`top-tasks-${from}-to-${to}`}
-            contextLabel={`Top Tasks ${periodLabel}`}
-          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!rows.length}
+            title={rows.length ? 'Export tasks to Excel' : 'No tasks to export'}
+            onClick={() => {
+              try {
+                exportTopTasksReportExcel({
+                  tasks: rows,
+                  from,
+                  to,
+                  fileName: `top-tasks-${from}-to-${to}`,
+                })
+                toast.success(
+                  `Exported ${rows.length} task${rows.length === 1 ? '' : 's'} to Excel.`,
+                )
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
+              }
+            }}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export to Excel
+          </Button>
         }
       />
 
