@@ -144,9 +144,15 @@ function escapeXml(value: string): string {
     .replace(/'/g, '&apos;')
 }
 
-function cellXml(value: string | number): string {
+type SheetCell = string | number | { date: string }
+
+function cellXml(value: SheetCell): string {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`
+  }
+  if (value && typeof value === 'object' && value.date) {
+    const iso = String(value.date).slice(0, 10)
+    return `<Cell ss:StyleID="Date"><Data ss:Type="DateTime">${iso}T00:00:00.000</Data></Cell>`
   }
   const text = escapeXml(String(value ?? ''))
   return `<Cell><Data ss:Type="String">${text}</Data></Cell>`
@@ -155,7 +161,11 @@ function cellXml(value: string | number): string {
 export interface SpreadsheetSheet {
   name: string
   headers: string[]
-  rows: Array<Array<string | number>>
+  rows: Array<Array<SheetCell>>
+  /** Rows above the column header, such as the report From / To range. */
+  leadingRows?: Array<Array<SheetCell>>
+  /** Excel column filter on the header row (includes a from–to filter on dates). */
+  autoFilter?: boolean
 }
 
 /** Excel forbids certain characters in sheet names, caps length at 31, and requires uniqueness. */
@@ -175,16 +185,29 @@ function sanitizeSheetName(raw: string, used: Set<string>): string {
 
 function worksheetXml(sheet: SpreadsheetSheet, usedNames: Set<string>): string {
   const safeSheet = escapeXml(sanitizeSheetName(sheet.name, usedNames))
+  const leading = sheet.leadingRows ?? []
+  const leadingXml = leading
+    .map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`)
+    .join('')
+  const spacer = leading.length ? '<Row/>' : ''
+  const headerRowIndex = leading.length === 0 ? 1 : leading.length + 2
+  const lastRow = headerRowIndex + sheet.rows.length
   const headerRow = `<Row>${sheet.headers.map((h) => cellXml(h)).join('')}</Row>`
   const dataRows = sheet.rows
     .map((row) => `<Row>${row.map((c) => cellXml(c)).join('')}</Row>`)
     .join('')
+  const autoFilter = sheet.autoFilter
+    ? `<AutoFilter x:Range="R${headerRowIndex}C1:R${Math.max(lastRow, headerRowIndex)}C${sheet.headers.length}" xmlns="urn:schemas-microsoft-com:office:excel"/>`
+    : ''
 
   return `<Worksheet ss:Name="${safeSheet}">
   <Table>
+   ${leadingXml}
+   ${spacer}
    ${headerRow.replace(/<Cell>/g, '<Cell ss:StyleID="Header">')}
    ${dataRows}
   </Table>
+  ${autoFilter}
  </Worksheet>`
 }
 
@@ -208,6 +231,9 @@ function buildSpreadsheetMl(sheets: SpreadsheetSheet[]): string {
   <Style ss:ID="Header">
    <Font ss:Bold="1"/>
    <Interior ss:Color="#EEF2FF" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="Date">
+   <NumberFormat ss:Format="dd-mmm-yyyy"/>
   </Style>
  </Styles>
  ${worksheets}
@@ -278,7 +304,9 @@ function estimateTimeCell(minutes: number | null | undefined): string {
 
 /**
  * One sheet per employee. Each Top task is its own row:
- * Date | Task | Time. Employees with no marks still get a sheet.
+ * Date | Task | Time. The selected From–To range is on the sheet, and the
+ * Date column has Excel's filter so the range can be narrowed again.
+ * Employees with no marks still get a sheet.
  */
 export function exportEmployeeTopTasksExcel({
   from,
@@ -290,19 +318,30 @@ export function exportEmployeeTopTasksExcel({
     throw new Error('No employees to export.')
   }
 
+  const periodRows = [
+    ['From', { date: from }],
+    ['To', { date: to }],
+  ]
+
   const sheets: SpreadsheetSheet[] = byEmployee.map((employee) => {
     const headers = ['Date', 'Task', 'Time']
-    const rows: Array<Array<string | number>> = employee.entries.length
+    const rows: SpreadsheetSheet['rows'] = employee.entries.length
       ? employee.entries.flatMap((entry) =>
           entry.tasks.map((task) => [
-            formatDate(entry.date),
+            { date: entry.date },
             task.project_name ? `${task.title} (${task.project_name})` : task.title,
             estimateTimeCell(task.estimate_minutes),
           ]),
         )
-      : [['—', 'No top tasks marked in this range', '']]
+      : [['', 'No top tasks marked in this range', '']]
 
-    return { name: employee.employee_name, headers, rows }
+    return {
+      name: employee.employee_name,
+      headers,
+      rows,
+      leadingRows: periodRows,
+      autoFilter: true,
+    }
   })
 
   const xml = buildSpreadsheetMl(sheets)
