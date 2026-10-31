@@ -188,7 +188,10 @@ function columnLetter(index: number): string {
 
 function parseSheetDate(iso: string): Date {
   const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
-  return new Date(year, (month || 1) - 1, day || 1)
+  // exceljs stores dates from Date#getTime() (UTC). Local midnight in IST is
+  // the previous evening UTC, so Saturday was written as Friday. Noon UTC
+  // keeps the calendar day, including Saturday.
+  return new Date(Date.UTC(year || 1970, (month || 1) - 1, day || 1, 12, 0, 0))
 }
 
 /** Real .xlsx workbook so sheet tabs (employee names) open in Excel. */
