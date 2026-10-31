@@ -658,19 +658,26 @@ export async function fetchMyTopStatus(): Promise<MyTopStatus> {
 }
 
 export interface TopTasksReportResponse {
+  from: string
+  to: string
+  /** First day of the range. Kept for older clients. */
   date: string
   count: number
   data: Task[]
 }
 
-/** Admin/HR report: all tasks marked as Top for a date (default today). */
+/** Admin/HR report: all tasks marked as Top between from and to (default today). */
 export async function fetchTopTasksReport(params: {
+  from?: string
+  to?: string
   date?: string
   employee_id?: number | null
   project_id?: number | null
 }): Promise<TopTasksReportResponse> {
   const { data } = await api.get<TopTasksReportResponse>(`/${portalBase()}/top-tasks`, {
     params: {
+      ...(params.from ? { from: params.from } : {}),
+      ...(params.to ? { to: params.to } : {}),
       ...(params.date ? { date: params.date } : {}),
       ...(params.employee_id ? { employee_id: params.employee_id } : {}),
       ...(params.project_id ? { project_id: params.project_id } : {}),
@@ -686,6 +693,8 @@ export interface TopTasksComplianceTask {
   project_name?: string | null
   status: string
   priority: string
+  top_task_date?: string | null
+  estimate_minutes?: number | null
 }
 
 export interface TopTasksComplianceEmployee {
@@ -702,7 +711,12 @@ export interface TopTasksComplianceEmployee {
 }
 
 export interface TopTasksComplianceResponse {
+  from: string
+  to: string
+  /** First day of the range. Kept for older clients. */
   date: string
+  /** True when from and to are the same day (daily minimum of 3 applies). */
+  single_day: boolean
   min_required: number
   summary: {
     total: number
@@ -714,8 +728,10 @@ export interface TopTasksComplianceResponse {
   employees: TopTasksComplianceEmployee[]
 }
 
-/** Admin/HR report: per-employee Top-3 compliance — who marked, who did not. */
+/** Admin/HR report: per-employee Top compliance for a from–to range. */
 export async function fetchTopTasksCompliance(params: {
+  from?: string
+  to?: string
   date?: string
   project_id?: number | null
 }): Promise<TopTasksComplianceResponse> {
@@ -723,6 +739,8 @@ export async function fetchTopTasksCompliance(params: {
     `/${portalBase()}/top-tasks-compliance`,
     {
       params: {
+        ...(params.from ? { from: params.from } : {}),
+        ...(params.to ? { to: params.to } : {}),
         ...(params.date ? { date: params.date } : {}),
         ...(params.project_id ? { project_id: params.project_id } : {}),
       },

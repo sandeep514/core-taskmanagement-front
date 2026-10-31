@@ -15,6 +15,7 @@ import { TASK_PRIORITIES, TASK_STATUSES, todayKey } from '@/types'
 import {
   cn,
   formatDate,
+  formatEstimateDuration,
   formatTaskAssignees,
 } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
@@ -40,7 +41,8 @@ export function TopTasksReportPage() {
   const user = useAuthStore((s) => s.user)
   const basePath = portalUiBase(user?.role)
 
-  const [date, setDate] = useState(todayKey())
+  const [from, setFrom] = useState(todayKey())
+  const [to, setTo] = useState(todayKey())
   const [employeeFilter, setEmployeeFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
   const [complianceFilter, setComplianceFilter] = useState<'all' | 'done' | 'pending' | 'none'>('all')
@@ -54,40 +56,50 @@ export function TopTasksReportPage() {
   const { data: employees } = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees })
   const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: fetchProjects })
 
+  const rangeInvalid = !from || !to || from > to
+
   const { data: report, isLoading, isError, refetch } = useQuery({
     queryKey: [
       'top-tasks-report',
-      date,
+      from,
+      to,
       employeeFilter,
       projectFilter,
     ],
     queryFn: () =>
       fetchTopTasksReport({
-        date: date || undefined,
+        from,
+        to,
         employee_id: employeeFilter !== 'all' ? Number(employeeFilter) : null,
         project_id: projectFilter !== 'all' ? Number(projectFilter) : null,
       }),
+    enabled: !rangeInvalid,
   })
 
   const { data: compliance } = useQuery({
-    queryKey: ['top-tasks-compliance', date, projectFilter],
+    queryKey: ['top-tasks-compliance', from, to, projectFilter],
     queryFn: () =>
       fetchTopTasksCompliance({
-        date: date || undefined,
+        from,
+        to,
         project_id: projectFilter !== 'all' ? Number(projectFilter) : null,
       }),
+    enabled: !rangeInvalid,
   })
+
+  const singleDay = compliance?.single_day ?? from === to
 
   const complianceRows = useMemo(() => {
     let list = compliance?.employees ?? []
     if (employeeFilter !== 'all') {
       list = list.filter((e) => e.id === Number(employeeFilter))
     }
-    if (complianceFilter === 'done') list = list.filter((e) => e.is_done)
-    else if (complianceFilter === 'pending') list = list.filter((e) => !e.is_done)
-    else if (complianceFilter === 'none') list = list.filter((e) => !e.has_marked)
+    const filter = !singleDay && complianceFilter === 'pending' ? 'none' : complianceFilter
+    if (filter === 'done') list = list.filter((e) => e.is_done)
+    else if (filter === 'pending') list = list.filter((e) => !e.is_done)
+    else if (filter === 'none') list = list.filter((e) => !e.has_marked)
     return list
-  }, [compliance, employeeFilter, complianceFilter])
+  }, [compliance, employeeFilter, complianceFilter, singleDay])
 
   const rows = report?.data ?? []
 
@@ -121,7 +133,14 @@ export function TopTasksReportPage() {
     setFormOpen(true)
   }
 
-  if (isLoading) return <PageLoader />
+  const periodLabel =
+    from && to && from === to
+      ? formatDate(from)
+      : from && to
+        ? `${formatDate(from)} – ${formatDate(to)}`
+        : ''
+
+  if (isLoading && !rangeInvalid) return <PageLoader />
 
   if (isError) {
     return (
@@ -138,25 +157,35 @@ export function TopTasksReportPage() {
     <div>
       <PageHeader
         title="Top Tasks Report"
-        description="Every task employees marked as a Top task for the selected date."
+        description="Every task employees marked as a Top task between the selected dates."
         actions={
           <ExportTasksButton
             tasks={rows}
-            fileName={`top-tasks-${report?.date ?? date}`}
-            contextLabel={`Top Tasks ${report?.date ?? date}`}
+            fileName={`top-tasks-${from}-to-${to}`}
+            contextLabel={`Top Tasks ${periodLabel}`}
           />
         }
       />
 
       <div className="mb-5 flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Date</Label>
+          <Label className="text-xs text-muted-foreground">From</Label>
           <Input
             type="date"
-            value={date}
-            max={todayKey()}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-9 w-[180px]"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-9 w-[160px]"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-9 w-[160px]"
           />
         </div>
 
@@ -206,12 +235,15 @@ export function TopTasksReportPage() {
           </Button>
         )}
       </div>
+      {rangeInvalid && (
+        <p className="mb-4 text-xs text-red-600">From date must be on or before To date.</p>
+      )}
 
       <div className="mb-5 flex flex-wrap gap-2 text-sm">
         <Badge variant="secondary" className="gap-1.5 px-3 py-1">
           <Star className="h-3.5 w-3.5 text-amber-600" fill="currentColor" />
           {summary.tasks} top {summary.tasks === 1 ? 'task' : 'tasks'}
-          {report?.date ? ` · ${formatDate(report.date)}` : ''}
+          {periodLabel ? ` · ${periodLabel}` : ''}
         </Badge>
         <Badge variant="secondary">{summary.employees} employees</Badge>
         <Badge variant="secondary">{summary.projects} projects</Badge>
@@ -219,12 +251,16 @@ export function TopTasksReportPage() {
           <>
             <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 gap-1.5 px-3 py-1">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              {compliance.summary.done}/{compliance.summary.total} marked 3+
+              {singleDay
+                ? `${compliance.summary.done}/${compliance.summary.total} marked 3+`
+                : `${compliance.summary.marked_any}/${compliance.summary.total} marked`}
             </Badge>
+            {singleDay && (
             <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 gap-1.5 px-3 py-1">
               <CircleAlert className="h-3.5 w-3.5" />
               {compliance.summary.pending} pending
             </Badge>
+            )}
             {compliance.summary.marked_none > 0 && (
               <Badge className="bg-red-100 text-red-700 hover:bg-red-100 gap-1.5 px-3 py-1">
                 <UserRoundX className="h-3.5 w-3.5" />
@@ -242,17 +278,28 @@ export function TopTasksReportPage() {
             <div>
               <h2 className="text-sm font-semibold">Top 3 compliance by employee</h2>
               <p className="text-xs text-muted-foreground">
-                Who marked their Top tasks for {compliance?.date ? formatDate(compliance.date) : 'the selected date'} — min {compliance?.min_required ?? 3} across all projects.
+                {singleDay
+                  ? `Who marked their Top tasks for ${periodLabel || 'the selected date'} — min ${compliance?.min_required ?? 3} across all projects.`
+                  : `Top tasks marked from ${formatDate(from)} to ${formatDate(to)}.`}
               </p>
             </div>
-            <Select value={complianceFilter} onValueChange={(v) => setComplianceFilter(v as typeof complianceFilter)}>
+            <Select
+              value={!singleDay && complianceFilter === 'pending' ? 'none' : complianceFilter}
+              onValueChange={(v) => setComplianceFilter(v as typeof complianceFilter)}
+            >
               <SelectTrigger className="h-8 w-[160px] text-xs">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All employees</SelectItem>
-                <SelectItem value="done">Done (3+)</SelectItem>
-                <SelectItem value="pending">Pending (&lt; 3)</SelectItem>
+                {singleDay ? (
+                  <>
+                    <SelectItem value="done">Done (3+)</SelectItem>
+                    <SelectItem value="pending">Pending (&lt; 3)</SelectItem>
+                  </>
+                ) : (
+                  <SelectItem value="done">Marked</SelectItem>
+                )}
                 <SelectItem value="none">Marked none (0)</SelectItem>
               </SelectContent>
             </Select>
@@ -283,20 +330,29 @@ export function TopTasksReportPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="tabular-nums font-semibold">
-                          {e.marked_count}/{compliance?.min_required ?? 3}
+                          {singleDay
+                            ? `${e.marked_count}/${compliance?.min_required ?? 3}`
+                            : e.marked_count}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {e.is_done ? (
+                        {singleDay && e.is_done ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
                             <CheckCircle2 className="h-3 w-3" />
                             Done
                           </span>
                         ) : e.has_marked ? (
+                          singleDay ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
                             <CircleAlert className="h-3 w-3" />
                             Missing {e.missing}
                           </span>
+                          ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Marked
+                          </span>
+                          )
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
                             <UserRoundX className="h-3 w-3" />
@@ -310,12 +366,21 @@ export function TopTasksReportPage() {
                         ) : (
                           <ul className="space-y-1">
                             {e.tasks.map((t) => (
-                              <li key={t.id} className="text-xs">
+                              <li key={`${t.id}-${t.top_task_date ?? ''}`} className="text-xs">
+                                {!singleDay && t.top_task_date ? (
+                                  <span className="text-muted-foreground">{formatDate(t.top_task_date)} · </span>
+                                ) : null}
                                 <span className="font-medium text-foreground">#{t.id}</span>{' '}
                                 <span className="text-muted-foreground">{t.title}</span>
                                 {t.project_name && (
                                   <span className="text-muted-foreground"> · {t.project_name}</span>
                                 )}
+                                {t.estimate_minutes != null && t.estimate_minutes > 0 ? (
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    · {formatEstimateDuration(t.estimate_minutes)}
+                                  </span>
+                                ) : null}
                               </li>
                             ))}
                           </ul>
@@ -337,11 +402,13 @@ export function TopTasksReportPage() {
       {!rows.length ? (
         <EmptyState
           icon={CalendarDays}
-          title="No Top tasks for this date"
+          title={singleDay ? 'No Top tasks for this date' : 'No Top tasks in this range'}
           description={
             hasActiveFilters
               ? 'No marked tasks match these filters.'
-              : 'Nobody marked a Top task for this date yet.'
+              : singleDay
+                ? 'Nobody marked a Top task for this date yet.'
+                : 'Nobody marked a Top task between these dates.'
           }
           action={
             hasActiveFilters ? (
