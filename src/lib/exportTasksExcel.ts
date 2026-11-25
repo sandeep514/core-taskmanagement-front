@@ -1,4 +1,5 @@
-import type { EmployeeTopTasksReportEmployeeRow, Task } from '@/types'
+import type { EmployeeTopTasksReportEmployeeRow, Task, TaskGapEvent } from '@/types'
+import { rowsForTasksAndEvents } from '@/lib/taskGapEvents'
 import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from '@/types'
 import {
   formatDate,
@@ -235,7 +236,8 @@ async function downloadXlsx(sheets: SpreadsheetSheet[], fileName: string): Promi
 
     sheet.headers.forEach((label, index) => {
       const width = Math.min(48, Math.max(14, label.length + 6))
-      worksheet.getColumn(index + 1).width = label === 'Title' || label === 'Task' ? 42 : width
+      worksheet.getColumn(index + 1).width =
+        label === 'Title' || label === 'Task' ? 42 : label === 'Event' ? 28 : width
     })
 
     if (sheet.autoFilter && sheet.headers.length) {
@@ -270,49 +272,76 @@ function taskEmployeeNames(task: Task): string[] {
   return ['Unassigned']
 }
 
-function groupedTopTaskRows(tasks: Task[]): SpreadsheetSheet['rows'] {
-  const sorted = [...tasks].sort((a, b) => {
-    const dateA = String(a.top_task_date ?? '').slice(0, 10)
-    const dateB = String(b.top_task_date ?? '').slice(0, 10)
-    if (dateA !== dateB) return dateA.localeCompare(dateB)
-    const projectA = a.project?.project_name ?? ''
-    const projectB = b.project?.project_name ?? ''
-    if (projectA !== projectB) return projectA.localeCompare(projectB)
-    return a.title.localeCompare(b.title)
-  })
-
-  let lastDate = ''
-  let lastProject = ''
-  return sorted.map((task) => {
+function groupedTopTaskRows(
+  tasks: Task[],
+  events: TaskGapEvent[] | undefined,
+  from: string,
+  to: string,
+): SpreadsheetSheet['rows'] {
+  const byDate = new Map<string, Task[]>()
+  for (const task of tasks) {
     const date = String(task.top_task_date ?? '').slice(0, 10)
-    const project = task.project?.project_name ?? `Project #${task.project_id}`
-    const showDate = date !== lastDate
-    const showProject = showDate || project !== lastProject
-    lastDate = date
-    lastProject = project
-    return [
-      showDate && date ? { date } : '',
-      showProject ? project : '',
-      task.title,
-      estimateTimeCell(task.estimate_minutes),
-    ]
-  })
+    if (!date) continue
+    const list = byDate.get(date) ?? []
+    list.push(task)
+    byDate.set(date, list)
+  }
+
+  const dated = rowsForTasksAndEvents(
+    [...byDate.entries()].map(([date, dayTasks]) => ({ date, tasks: dayTasks })),
+    events,
+    from,
+    to,
+  )
+
+  const sheetRows: SpreadsheetSheet['rows'] = []
+  for (const day of dated) {
+    if (!day.tasks.length) {
+      sheetRows.push([{ date: day.date }, day.eventName, '', '', ''])
+      continue
+    }
+
+    const sorted = [...day.tasks].sort((a, b) => {
+      const projectA = a.project?.project_name ?? ''
+      const projectB = b.project?.project_name ?? ''
+      if (projectA !== projectB) return projectA.localeCompare(projectB)
+      return a.title.localeCompare(b.title)
+    })
+
+    let lastProject = ''
+    sorted.forEach((task, index) => {
+      const project = task.project?.project_name ?? `Project #${task.project_id}`
+      const showProject = project !== lastProject
+      lastProject = project
+      sheetRows.push([
+        index === 0 ? { date: day.date } : '',
+        index === 0 ? day.eventName : '',
+        showProject ? project : '',
+        task.title,
+        estimateTimeCell(task.estimate_minutes),
+      ])
+    })
+  }
+
+  return sheetRows
 }
 
 /**
  * Top Tasks report as .xlsx. One sheet per employee (sheet tab and a row
- * inside the sheet). Columns are Date, Project, Title, Time, grouped by
- * date then project.
+ * inside the sheet). Columns are Date, Event, Project, Title, Time, grouped by
+ * date then project. Event is the holiday or other event name for that date.
  */
 export async function exportTopTasksReportExcel({
   tasks,
   from,
   to,
+  events,
   fileName,
 }: {
   tasks: Task[]
   from: string
   to: string
+  events?: TaskGapEvent[]
   fileName?: string
 }): Promise<void> {
   if (!tasks.length) {
@@ -332,8 +361,8 @@ export async function exportTopTasksReportExcel({
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, employeeTasks]) => ({
       name,
-      headers: ['Date', 'Project', 'Title', 'Time'],
-      rows: groupedTopTaskRows(employeeTasks),
+      headers: ['Date', 'Event', 'Project', 'Title', 'Time'],
+      rows: groupedTopTaskRows(employeeTasks, events, from, to),
       leadingRows: [
         ['Employee', name],
         ['From', { date: from }],
@@ -372,6 +401,7 @@ export interface ExportEmployeeTopTasksOptions {
   from: string
   to: string
   byEmployee: EmployeeTopTasksReportEmployeeRow[]
+  events?: TaskGapEvent[]
   /** File name without extension. */
   fileName?: string
 }
@@ -391,6 +421,7 @@ export async function exportEmployeeTopTasksExcel({
   from,
   to,
   byEmployee,
+  events,
   fileName,
 }: ExportEmployeeTopTasksOptions): Promise<void> {
   if (!byEmployee.length) {
@@ -403,16 +434,20 @@ export async function exportEmployeeTopTasksExcel({
   ]
 
   const sheets: SpreadsheetSheet[] = byEmployee.map((employee) => {
-    const headers = ['Date', 'Task', 'Time']
-    const rows: SpreadsheetSheet['rows'] = employee.entries.length
-      ? employee.entries.flatMap((entry) =>
-          entry.tasks.map((task) => [
-            { date: entry.date },
-            task.project_name ? `${task.title} (${task.project_name})` : task.title,
-            estimateTimeCell(task.estimate_minutes),
-          ]),
+    const headers = ['Date', 'Event', 'Task', 'Time']
+    const dated = rowsForTasksAndEvents(employee.entries, events, from, to)
+    const rows: SpreadsheetSheet['rows'] = dated.length
+      ? dated.flatMap((entry) =>
+          entry.tasks.length
+            ? entry.tasks.map((task) => [
+                { date: entry.date },
+                entry.eventName,
+                task.project_name ? `${task.title} (${task.project_name})` : task.title,
+                estimateTimeCell(task.estimate_minutes),
+              ])
+            : [[{ date: entry.date }, entry.eventName, 'No tasks marked', '']],
         )
-      : [['', 'No top tasks marked in this range', '']]
+      : [['', '', 'No top tasks marked in this range', '']]
 
     return {
       name: employee.employee_name,

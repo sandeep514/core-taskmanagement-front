@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CalendarRange, FileSpreadsheet, ListTodo, Search, Users } from 'lucide-react'
-import { fetchEmployeeTopTasksReport } from '@/lib/api'
+import { fetchEmployeeTopTasksReport, fetchTaskGapEvents } from '@/lib/api'
 import { getApiError } from '@/lib/api-error'
 import { useAuthStore } from '@/stores/authStore'
 import { TASK_PRIORITIES, TASK_STATUSES } from '@/types'
 import type { EmployeeTopTaskItem } from '@/types'
 import { cn, formatDate, todayDateString } from '@/lib/utils'
 import { exportEmployeeTopTasksExcel } from '@/lib/exportTasksExcel'
+import { rowsForTasksAndEvents } from '@/lib/taskGapEvents'
 import { TaskGapEventsNotice } from '@/components/admin/TaskGapEventsNotice'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/loading'
@@ -90,6 +91,12 @@ export function EmployeeTasksReportPage() {
     enabled: Boolean(user && applied.from && applied.to),
   })
 
+  const { data: gapEvents } = useQuery({
+    queryKey: ['task-gap-events', applied.from, applied.to],
+    queryFn: () => fetchTaskGapEvents({ from: applied.from, to: applied.to }),
+    enabled: Boolean(applied.from && applied.to && applied.from <= applied.to),
+  })
+
   const applyFilters = () => {
     if (!from || !to || from > to) return
     setApplied({ from, to })
@@ -106,6 +113,7 @@ export function EmployeeTasksReportPage() {
       from: data.from,
       to: data.to,
       byEmployee: data.by_employee,
+      events: gapEvents,
       fileName: `employee-top-tasks-${data.from}-to-${data.to}`,
     }).catch((err: unknown) => {
       toast.error(err instanceof Error ? err.message : 'Failed to export tasks.')
@@ -209,7 +217,14 @@ export function EmployeeTasksReportPage() {
             <p className="text-sm text-muted-foreground">No employees found.</p>
           ) : (
             <div className="grid gap-4 xl:grid-cols-2">
-              {data.by_employee.map((employee) => (
+              {data.by_employee.map((employee) => {
+                const datedRows = rowsForTasksAndEvents(
+                  employee.entries,
+                  gapEvents,
+                  data.from,
+                  data.to,
+                )
+                return (
                 <Card key={employee.employee_id}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base flex flex-wrap items-center gap-2">
@@ -228,7 +243,7 @@ export function EmployeeTasksReportPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {employee.entries.length === 0 ? (
+                    {datedRows.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-2">
                         No top tasks marked in this range.
                       </p>
@@ -237,21 +252,30 @@ export function EmployeeTasksReportPage() {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                              <th className="py-2 pr-3 font-medium w-[110px]">Date</th>
-                              <th className="py-2 pl-3 font-medium">Top 3 Tasks</th>
+                              <th className="py-2 pr-3 font-medium w-[140px]">Date</th>
+                              <th className="py-2 pl-3 font-medium">Top tasks</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {employee.entries.map((entry) => (
+                            {datedRows.map((entry) => (
                               <tr
                                 key={entry.date}
                                 className="border-b border-border last:border-0 align-top"
                               >
                                 <td className="py-2.5 pr-3 whitespace-nowrap text-muted-foreground">
-                                  {formatDate(entry.date)}
+                                  <div>{formatDate(entry.date)}</div>
+                                  {entry.eventName ? (
+                                    <div className="mt-0.5 text-xs font-medium text-amber-800">{entry.eventName}</div>
+                                  ) : null}
                                 </td>
                                 <td className="py-2.5 pl-3">
-                                  <TaskList tasks={entry.tasks} />
+                                  {entry.tasks.length ? (
+                                    <TaskList tasks={entry.tasks} />
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                      No tasks marked. Tasks can still be added if someone worked.
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             ))}
@@ -261,7 +285,8 @@ export function EmployeeTasksReportPage() {
                     )}
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </>

@@ -121,7 +121,7 @@ export function TaskGapEventsPage() {
     <div>
       <PageHeader
         title="No-Task Events"
-        description="Record days when tasks were not added, such as a server issue or a festival holiday."
+        description="Record a server issue, festival holiday, or other event. The name shows on the report for those dates. Employees who work that day can still add tasks."
         actions={
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" />

@@ -33,7 +33,7 @@ export function TaskGapEventsNotice({ from, to }: { from: string; to: string }) 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-medium text-amber-950">
           <CalendarOff className="h-4 w-4" />
-          Tasks were not expected on these days
+          Event or holiday in this report
         </p>
         {isAdmin && (
           <Link to="/admin/task-gap-events" className="text-xs font-medium text-amber-900 underline">
@@ -41,6 +41,9 @@ export function TaskGapEventsNotice({ from, to }: { from: string; to: string }) 
           </Link>
         )}
       </div>
+      <p className="mt-1 text-xs text-amber-900">
+        The event name is shown on those dates. Employees who worked can still add tasks, and those tasks stay in the report.
+      </p>
       <ul className="mt-2 space-y-1 text-sm text-amber-950">
         {data.map((event) => (
           <li key={event.id}>

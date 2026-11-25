@@ -8,6 +8,7 @@ import {
   fetchProjects,
   fetchTopTasksCompliance,
   fetchTopTasksReport,
+  fetchTaskGapEvents,
   portalUiBase,
 } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
@@ -37,6 +38,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { exportTopTasksReportExcel } from '@/lib/exportTasksExcel'
+import { eventTitlesOnDate } from '@/lib/taskGapEvents'
 import { TaskGapEventsNotice } from '@/components/admin/TaskGapEventsNotice'
 
 export function TopTasksReportPage() {
@@ -59,6 +61,12 @@ export function TopTasksReportPage() {
   const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: fetchProjects })
 
   const rangeInvalid = !from || !to || from > to
+
+  const { data: gapEvents } = useQuery({
+    queryKey: ['task-gap-events', from, to],
+    queryFn: () => fetchTaskGapEvents({ from, to }),
+    enabled: !rangeInvalid,
+  })
 
   const { data: report, isLoading, isError, refetch } = useQuery({
     queryKey: [
@@ -173,6 +181,7 @@ export function TopTasksReportPage() {
                     tasks: rows,
                     from,
                     to,
+                    events: gapEvents,
                     fileName: `top-tasks-${from}-to-${to}`,
                   })
                   toast.success(
@@ -303,7 +312,7 @@ export function TopTasksReportPage() {
               <h2 className="text-sm font-semibold">Top 3 compliance by employee</h2>
               <p className="text-xs text-muted-foreground">
                 {singleDay
-                  ? `Who marked their Top tasks for ${periodLabel || 'the selected date'} — min ${compliance?.min_required ?? 3} across all projects.`
+                  ? `Who marked their Top tasks for ${periodLabel || 'the selected date'}${eventTitlesOnDate(gapEvents, from) ? ` · ${eventTitlesOnDate(gapEvents, from)}` : ''} — min ${compliance?.min_required ?? 3} across all projects.`
                   : `Top tasks marked from ${formatDate(from)} to ${formatDate(to)}.`}
               </p>
             </div>
@@ -386,13 +395,22 @@ export function TopTasksReportPage() {
                       </td>
                       <td className="px-4 py-3">
                         {e.tasks.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-xs text-muted-foreground">
+                            {singleDay && eventTitlesOnDate(gapEvents, from)
+                              ? eventTitlesOnDate(gapEvents, from)
+                              : '—'}
+                          </span>
                         ) : (
                           <ul className="space-y-1">
                             {e.tasks.map((t) => (
                               <li key={`${t.id}-${t.top_task_date ?? ''}`} className="text-xs">
                                 {!singleDay && t.top_task_date ? (
                                   <span className="text-muted-foreground">{formatDate(t.top_task_date)} · </span>
+                                ) : null}
+                                {eventTitlesOnDate(gapEvents, t.top_task_date) ? (
+                                  <span className="font-medium text-amber-800">
+                                    {eventTitlesOnDate(gapEvents, t.top_task_date)} ·{' '}
+                                  </span>
                                 ) : null}
                                 <span className="font-medium text-foreground">#{t.id}</span>{' '}
                                 <span className="text-muted-foreground">{t.title}</span>
@@ -518,7 +536,12 @@ export function TopTasksReportPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
-                          {formatDate(task.top_task_date)}
+                          <div>{formatDate(task.top_task_date)}</div>
+                          {eventTitlesOnDate(gapEvents, task.top_task_date) ? (
+                            <div className="mt-0.5 font-medium text-amber-800">
+                              {eventTitlesOnDate(gapEvents, task.top_task_date)}
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     )
