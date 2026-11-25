@@ -37,6 +37,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal'
 import { TaskFormModal } from '@/components/tasks/TaskFormModal'
 import { exportTopTasksReportExcel } from '@/lib/exportTasksExcel'
+import { TaskGapEventsNotice } from '@/components/admin/TaskGapEventsNotice'
 
 export function TopTasksReportPage() {
   const user = useAuthStore((s) => s.user)
@@ -260,6 +261,7 @@ export function TopTasksReportPage() {
       {rangeInvalid && (
         <p className="mb-4 text-xs text-red-600">From date must be on or before To date.</p>
       )}
+      {!rangeInvalid && <TaskGapEventsNotice from={from} to={to} />}
 
       <div className="mb-5 flex flex-wrap gap-2 text-sm">
         <Badge variant="secondary" className="gap-1.5 px-3 py-1">

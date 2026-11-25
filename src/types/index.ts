@@ -46,6 +46,27 @@ export interface Department {
   updated_at: string
 }
 
+/** Why tasks were not added on a date or range. */
+export type TaskGapReason = 'server_issue' | 'festival_holiday' | 'other'
+
+export const TASK_GAP_REASONS: { value: TaskGapReason; label: string }[] = [
+  { value: 'server_issue', label: 'Server issue' },
+  { value: 'festival_holiday', label: 'Festival holiday' },
+  { value: 'other', label: 'Other' },
+]
+
+export interface TaskGapEvent {
+  id: number
+  reason: TaskGapReason
+  title: string
+  from_date: string
+  to_date: string
+  notes: string | null
+  created_by_name: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Client {
   id: number
   name: string

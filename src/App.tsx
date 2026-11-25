@@ -21,6 +21,7 @@ import { ActivityLogsPage } from '@/pages/admin/ActivityLogsPage'
 import { ProjectsPage } from '@/pages/admin/ProjectsPage'
 import { AdminProjectBoardPage } from '@/pages/admin/AdminProjectBoardPage'
 import { TopTasksReportPage } from '@/pages/admin/TopTasksReportPage'
+import { TaskGapEventsPage } from '@/pages/admin/TaskGapEventsPage'
 import { EmployeeTasksReportPage } from '@/pages/admin/EmployeeTasksReportPage'
 import { MyProjectsPage } from '@/pages/employee/MyProjectsPage'
 import { ProjectBoardPage } from '@/pages/employee/ProjectBoardPage'
@@ -65,6 +66,7 @@ export default function App() {
                 <Route path="projects/:projectId" element={<AdminProjectBoardPage />} />
                 <Route path="top-tasks" element={<TopTasksReportPage />} />
                 <Route path="employee-tasks" element={<EmployeeTasksReportPage />} />
+                <Route path="task-gap-events" element={<TaskGapEventsPage />} />
                 <Route path="activity-logs" element={<ActivityLogsPage />} />
                 <Route path="work-report" element={<WorkReportPage />} />
                 <Route path="settings" element={<SettingsPage />} />

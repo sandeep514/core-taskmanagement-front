@@ -9,6 +9,7 @@ import { TASK_PRIORITIES, TASK_STATUSES } from '@/types'
 import type { EmployeeTopTaskItem } from '@/types'
 import { cn, formatDate, todayDateString } from '@/lib/utils'
 import { exportEmployeeTopTasksExcel } from '@/lib/exportTasksExcel'
+import { TaskGapEventsNotice } from '@/components/admin/TaskGapEventsNotice'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageLoader } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
@@ -163,6 +164,10 @@ export function EmployeeTasksReportPage() {
           )}
         </CardContent>
       </Card>
+
+      {applied.from && applied.to && applied.from <= applied.to && (
+        <TaskGapEventsNotice from={applied.from} to={applied.to} />
+      )}
 
       {isLoading ? (
         <PageLoader />

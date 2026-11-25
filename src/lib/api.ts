@@ -7,6 +7,7 @@ import type {
   DashboardStats,
   Department,
   Designation,
+  TaskGapEvent,
   EaUser,
   Employee,
   HrUser,
@@ -256,6 +257,43 @@ export async function toggleDesignationStatus(id: number): Promise<Designation> 
 }
 
 // ─── Admin: Departments ─────────────────────────────────────────────────────
+
+export async function fetchTaskGapEvents(params?: {
+  from?: string
+  to?: string
+}): Promise<TaskGapEvent[]> {
+  const { data } = await api.get<TaskGapEvent[]>('/admin/task-gap-events', { params })
+  return data
+}
+
+export async function createTaskGapEvent(payload: {
+  reason: TaskGapEvent['reason']
+  title: string
+  from_date: string
+  to_date: string
+  notes?: string | null
+}): Promise<TaskGapEvent> {
+  const { data } = await api.post<TaskGapEvent>('/admin/task-gap-events', payload)
+  return data
+}
+
+export async function updateTaskGapEvent(
+  id: number,
+  payload: {
+    reason: TaskGapEvent['reason']
+    title: string
+    from_date: string
+    to_date: string
+    notes?: string | null
+  },
+): Promise<TaskGapEvent> {
+  const { data } = await api.put<TaskGapEvent>(`/admin/task-gap-events/${id}`, payload)
+  return data
+}
+
+export async function deleteTaskGapEvent(id: number): Promise<void> {
+  await api.delete(`/admin/task-gap-events/${id}`)
+}
 
 export async function fetchDepartments(): Promise<Department[]> {
   const { data } = await api.get<Department[]>('/admin/departments')
